@@ -1,0 +1,277 @@
+{% extends "Entron/base_app.html" %}
+
+{% block title %}Analytics · IntrusionX{% endblock %}
+{% block topbar_title %}Analytics{% endblock %}
+
+{% block extra_head %}
+<style>
+  .filter-bar{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+  }
+  .filter-bar input[type="date"]{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 12.5px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-family: var(--font-sans);
+  }
+  .filter-bar .sep{ color: var(--text-faint); font-size: 12px; }
+
+  .summary-grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .stat-card{
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .stat-card .stat-label{
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0 0 10px;
+  }
+  .stat-card .stat-value{
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .stat-card .stat-sub{
+    font-size: 11.5px;
+    color: var(--text-faint);
+    margin: 4px 0 0;
+  }
+
+  .charts-grid{
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .charts-grid.halves{ grid-template-columns: 1.6fr 1fr; }
+  .chart-canvas-wrap{ position: relative; height: 240px; }
+
+  .gauge-wrap{
+    position: relative;
+    height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .gauge-center{
+    position: absolute;
+    top: 60%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+  .gauge-center .gauge-value{ font-size: 26px; font-weight: 700; color: var(--text); }
+  .gauge-center .gauge-label{
+    font-size: 10.5px;
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+  }
+
+  @media (max-width: 980px){ .charts-grid, .charts-grid.halves{ grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-head">
+  <p class="eyebrow">Deeper look</p>
+  <h1>Analytics</h1>
+</div>
+
+<form method="get" class="filter-bar" id="range-form">
+  <select name="range" class="select-filter" onchange="document.getElementById('start_date').value=''; document.getElementById('end_date').value=''; this.form.submit()">
+    <option value="all" {% if range_preset == "all" %}selected{% endif %}>All time</option>
+    <option value="today" {% if range_preset == "today" %}selected{% endif %}>Today</option>
+    <option value="7d" {% if range_preset == "7d" %}selected{% endif %}>Last 7 days</option>
+    <option value="30d" {% if range_preset == "30d" %}selected{% endif %}>Last 30 days</option>
+    <option value="month" {% if range_preset == "month" %}selected{% endif %}>This month</option>
+  </select>
+  <span class="sep">or custom range</span>
+  <input type="date" name="start_date" id="start_date" value="{{ start_date }}">
+  <span class="sep">to</span>
+  <input type="date" name="end_date" id="end_date" value="{{ end_date }}">
+  <button type="submit" class="btn">Apply</button>
+</form>
+
+<div class="summary-grid">
+  <div class="stat-card">
+    <p class="stat-label">Total Alerts</p>
+    <p class="stat-value">{{ total_alerts }}</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Avg Detection Confidence</p>
+    <p class="stat-value">{{ avg_confidence }}%</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Resolution Rate</p>
+    <p class="stat-value">{{ resolution_rate }}%</p>
+    <p class="stat-sub">{{ resolved_count }} of {{ total_alerts }} resolved</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Most Common Attack</p>
+    <p class="stat-value" style="font-size:17px;">{{ top_attack_name }}</p>
+    <p class="stat-sub">{{ top_attack_count }} occurrence(s)</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Most Targeted Device</p>
+    <p class="stat-value" style="font-size:17px;">{{ top_device_name }}</p>
+    <p class="stat-sub">{{ top_device_count }} alert(s)</p>
+  </div>
+</div>
+
+<div class="charts-grid">
+  <div class="card">
+    <div class="card-head">
+      <h3>Alerts by Severity</h3>
+      <span class="card-sub">SELECTED RANGE</span>
+    </div>
+    <div class="card-body"><div class="chart-canvas-wrap"><canvas id="chart-severity"></canvas></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Top Attacked Devices</h3>
+      <span class="card-sub">TOP 5</span>
+    </div>
+    <div class="card-body"><div class="chart-canvas-wrap"><canvas id="chart-top-devices"></canvas></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Confidence Distribution</h3>
+      <span class="card-sub">SELECTED RANGE</span>
+    </div>
+    <div class="card-body"><div class="chart-canvas-wrap"><canvas id="chart-confidence"></canvas></div></div>
+  </div>
+</div>
+
+<div class="charts-grid halves">
+  <div class="card">
+    <div class="card-head">
+      <h3>Attack Activity by Hour of Day</h3>
+      <span class="card-sub">SELECTED RANGE</span>
+    </div>
+    <div class="card-body"><div class="chart-canvas-wrap"><canvas id="chart-hourly"></canvas></div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Resolution Rate</h3>
+      <span class="card-sub">SELECTED RANGE</span>
+    </div>
+    <div class="card-body">
+      <div class="gauge-wrap">
+        <canvas id="chart-resolution-gauge"></canvas>
+        <div class="gauge-center">
+          <div class="gauge-value">{{ resolution_rate }}%</div>
+          <div class="gauge-label">Resolved</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{ severity_breakdown|json_script:"data-severity" }}
+{{ top_devices|json_script:"data-top-devices" }}
+{{ confidence_distribution|json_script:"data-confidence" }}
+{{ hourly_activity|json_script:"data-hourly" }}
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+  const COLORS = {
+    text: "#8A96A3", grid: "#1A2129",
+    teal: "#2DD4BF", flag: "#F2A93B", danger: "#EF5A5A", faint: "#52606C"
+  };
+  Chart.defaults.color = COLORS.text;
+  Chart.defaults.font.family = "'IBM Plex Sans', 'Inter', sans-serif";
+  Chart.defaults.font.size = 11;
+
+  function getData(id){ return JSON.parse(document.getElementById(id).textContent); }
+  const gridOpts = { color: COLORS.grid, drawTicks: false };
+
+  const severity = getData("data-severity");
+  new Chart(document.getElementById("chart-severity"), {
+    type: "doughnut",
+    data: {
+      labels: severity.labels,
+      datasets: [{ data: severity.data, backgroundColor: [COLORS.teal, COLORS.flag, COLORS.danger], borderColor: "#141B23", borderWidth: 2 }]
+    },
+    options: { cutout: "62%", plugins: { legend: { position: "bottom", labels: { boxWidth: 10, padding: 12 } } } }
+  });
+
+  const topDevices = getData("data-top-devices");
+  new Chart(document.getElementById("chart-top-devices"), {
+    type: "bar",
+    data: { labels: topDevices.labels, datasets: [{ data: topDevices.data, backgroundColor: COLORS.teal, borderRadius: 4, maxBarThickness: 26 }] },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: { x: { grid: gridOpts, beginAtZero: true, ticks: { precision: 0 } }, y: { grid: { display: false } } }
+    }
+  });
+
+  const confidence = getData("data-confidence");
+  new Chart(document.getElementById("chart-confidence"), {
+    type: "bar",
+    data: { labels: confidence.labels, datasets: [{ data: confidence.data, backgroundColor: COLORS.flag, borderRadius: 4, maxBarThickness: 40 }] },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: { x: { grid: { display: false } }, y: { grid: gridOpts, beginAtZero: true, ticks: { precision: 0 } } }
+    }
+  });
+
+  const hourly = getData("data-hourly");
+  new Chart(document.getElementById("chart-hourly"), {
+    type: "bar",
+    data: { labels: hourly.labels, datasets: [{ data: hourly.data, backgroundColor: COLORS.teal, borderRadius: 3, maxBarThickness: 18 }] },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+        y: { grid: gridOpts, beginAtZero: true, ticks: { precision: 0 } }
+      }
+    }
+  });
+
+  // Resolution rate -- semi-circle "gauge" doughnut
+  const resolutionRate = {{ resolution_rate }};
+  new Chart(document.getElementById("chart-resolution-gauge"), {
+    type: "doughnut",
+    data: {
+      datasets: [{
+        data: [resolutionRate, 100 - resolutionRate],
+        backgroundColor: [COLORS.teal, "#1A2129"],
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      circumference: 180,
+      rotation: -90,
+      cutout: "75%",
+      plugins: { legend: { display: false }, tooltip: { enabled: false } }
+    }
+  });
+</script>
+{% endblock %}

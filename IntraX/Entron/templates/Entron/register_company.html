@@ -1,0 +1,52 @@
+{% extends "Entron/base_auth.html" %}
+
+{% block title %}Register a Client · IntrusionX{% endblock %}
+
+{% block brand_heading %}Onboard a new client.{% endblock %}
+{% block brand_copy %}Create the company account. The client signs in afterward with the username and password you set here — separately from your own staff login.{% endblock %}
+
+{% block eyebrow %}Staff tool{% endblock %}
+{% block heading %}Register a company{% endblock %}
+{% block subtext %}Signed in as staff — {{ request.user.username }}. This creates a new client's login, not your own.{% endblock %}
+
+{% block form_content %}
+<form method="post" action="">
+  {% csrf_token %}
+
+  <div class="field">
+    <label for="name">Company name</label>
+    <input type="text" id="name" name="name" placeholder="Acme Corp" autocomplete="off" required autofocus>
+  </div>
+
+  <div class="field">
+    <label for="username">Company username</label>
+    <input type="text" id="username" name="username" placeholder="acme-corp" autocomplete="off" required>
+    <p class="field-hint">This is what the client will use to sign in at the company login page. Must be unique — no spaces.</p>
+  </div>
+
+  <div class="field">
+    <label for="email">Company email</label>
+    <input type="email" id="email" name="email" placeholder="ops@acme.com" autocomplete="off" required>
+  </div>
+
+  <div class="field-row">
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" placeholder="At least 8 characters" autocomplete="new-password" required minlength="8">
+    </div>
+    <div class="field">
+      <label for="confirm_password">Confirm password</label>
+      <input type="password" id="confirm_password" name="confirm_password" placeholder="Repeat password" autocomplete="new-password" required minlength="8">
+    </div>
+  </div>
+
+  <p class="field-hint">A device registration key is generated automatically and shown once on the next screen — pass it to the client so their agents can connect.</p>
+
+  <button type="submit" class="btn-primary">Create company</button>
+</form>
+{% endblock %}
+
+{% block foot_links %}
+<span>Done onboarding?</span>
+<a href="{% url 'logout_view' %}">Sign out</a>
+{% endblock %}

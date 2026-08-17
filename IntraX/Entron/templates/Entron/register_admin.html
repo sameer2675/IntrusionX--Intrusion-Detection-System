@@ -1,0 +1,73 @@
+{% extends "Entron/base_auth.html" %}
+
+{% block title %}Register Administrator · IntrusionX{% endblock %}
+
+{% block brand_heading %}Add your first admin.{% endblock %}
+{% block brand_copy %}Administrators can sign in to view alerts, manage devices, and invite the rest of the security team.{% endblock %}
+
+{% block eyebrow %}Company setup{% endblock %}
+{% block heading %}Register an administrator{% endblock %}
+{% block subtext %}This account will be able to sign in and manage alerts for your company.{% endblock %}
+
+{% block form_content %}
+<form method="post" action="" id="register-admin-form">
+  {% csrf_token %}
+
+  <div class="field field-row">
+    <div>
+      <label for="first_name">First name</label>
+      <input type="text" id="first_name" name="first_name" placeholder="Jordan" autocomplete="given-name" required autofocus>
+    </div>
+    <div>
+      <label for="last_name">Last name</label>
+      <input type="text" id="last_name" name="last_name" placeholder="Ade" autocomplete="family-name" required>
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" placeholder="jordan.ade" autocomplete="username" required>
+  </div>
+
+  <div class="field">
+    <label for="email">Work email</label>
+    <input type="email" id="email" name="email" placeholder="jordan@company.com" autocomplete="email" required>
+  </div>
+
+  <div class="field">
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" placeholder="Create a password" autocomplete="new-password" required>
+  </div>
+
+  <div class="field">
+    <label for="password_confirm">Confirm password</label>
+    <input type="password" id="password_confirm" placeholder="Re-enter password" autocomplete="new-password" required>
+    <p class="field-hint">Checked in your browser before submitting; not sent to the server.</p>
+  </div>
+
+  <button type="submit" class="btn-primary">Create administrator</button>
+</form>
+
+<script>
+  document.getElementById('register-admin-form').addEventListener('submit', function (e) {
+    var password = document.getElementById('password');
+    var confirm = document.getElementById('password_confirm');
+    if (password.value !== confirm.value) {
+      e.preventDefault();
+      confirm.setCustomValidity("Passwords don't match.");
+      confirm.reportValidity();
+    } else {
+      confirm.setCustomValidity('');
+    }
+  });
+  document.getElementById('password_confirm').addEventListener('input', function () {
+    this.setCustomValidity('');
+  });
+</script>
+{% endblock %}
+
+{% block foot_links %}
+<a href="{% url 'permission_manager' %}">← Back to Permission Manager</a>
+<span>Already have an administrator account?</span>
+<a href="{% url 'admin_login' %}">Sign in</a>
+{% endblock %}

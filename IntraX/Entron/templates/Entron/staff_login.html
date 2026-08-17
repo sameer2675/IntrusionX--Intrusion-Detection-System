@@ -1,0 +1,33 @@
+{% extends "Entron/base_auth.html" %}
+
+{% block title %}Staff Access · IntrusionX{% endblock %}
+
+{% block brand_heading %}Run the platform.{% endblock %}
+{% block brand_copy %}Sign in with your IntrusionX staff account to onboard new client companies.{% endblock %}
+
+{% block eyebrow %}Staff access{% endblock %}
+{% block heading %}Sign in as staff{% endblock %}
+{% block subtext %}This is for IntrusionX staff only -- not company admins or client owners.{% endblock %}
+
+{% block form_content %}
+<form method="post" action="">
+  {% csrf_token %}
+
+  <div class="field">
+    <label for="username">Staff username</label>
+    <input type="text" id="username" name="username" placeholder="admin" autocomplete="username" required autofocus>
+  </div>
+
+  <div class="field">
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" placeholder="Staff password" autocomplete="current-password" required>
+  </div>
+
+  <button type="submit" class="btn-primary">Sign in</button>
+</form>
+{% endblock %}
+
+{% block foot_links %}
+<span>Company admin?</span>
+<a href="{% url 'admin_login' %}">Sign in instead</a>
+{% endblock %}

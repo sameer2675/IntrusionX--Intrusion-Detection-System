@@ -1,0 +1,34 @@
+{% extends "Entron/base_auth.html" %}
+
+{% block title %}Company Access · IntrusionX{% endblock %}
+
+{% block brand_heading %}Connect your company.{% endblock %}
+{% block brand_copy %}Sign in with your company password to reach your fleet of monitored devices and administrators.{% endblock %}
+
+{% block eyebrow %}Company access{% endblock %}
+{% block heading %}Sign in to your company{% endblock %}
+{% block subtext %}Enter your company username and password.{% endblock %}
+
+{% block form_content %}
+<form method="post" action="">
+  {% csrf_token %}
+
+  <div class="field">
+    <label for="username">Company username</label>
+    <input type="text" id="username" name="username" placeholder="acme-corp" autocomplete="username" required autofocus>
+  </div>
+
+  <div class="field">
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" placeholder="Your company password" autocomplete="current-password" required>
+    <p class="field-hint">Not your device registration key — that's a separate value under Company Settings, used only by the IntrusionX agent.</p>
+  </div>
+
+  <button type="submit" class="btn-primary">Sign in</button>
+</form>
+{% endblock %}
+
+{% block foot_links %}
+<span>Administrator account?</span>
+<a href="{% url 'admin_login' %}">Sign in instead</a>
+{% endblock %}

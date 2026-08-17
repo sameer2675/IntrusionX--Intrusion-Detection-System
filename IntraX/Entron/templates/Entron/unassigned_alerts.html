@@ -1,0 +1,184 @@
+{% extends "Entron/base_app.html" %}
+
+{% block title %}Unassigned Alerts · IntrusionX{% endblock %}
+{% block topbar_title %}Alerts{% endblock %}
+
+{% block extra_head %}
+<style>
+  table.data-table{ width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.data-table th{
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    font-weight: 500;
+    padding: 0 14px 10px;
+  }
+  table.data-table td{
+    padding: 11px 14px;
+    border-top: 1px solid var(--border-soft);
+    color: var(--text-dim);
+  }
+  table.data-table td.primary{ color: var(--text); }
+  table.data-table tr:hover td{ background: var(--surface-raised); }
+  .empty-row td{ text-align: center; color: var(--text-faint); padding: 30px 12px; }
+
+  .device-head{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .breadcrumb{ font-size: 12.5px; color: var(--text-faint); margin-bottom: 6px; }
+  .breadcrumb a{ color: var(--accent); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<p class="breadcrumb"><a href="{% url 'alerts_page' %}">← All devices</a></p>
+
+<div class="device-head">
+  <div>
+    <p class="eyebrow">Device history</p>
+    <h1>Unassigned alerts</h1>
+  </div>
+  {% if can_manage_alerts %}
+  <form method="post" action="{% url 'resolve_all_unassigned' %}" id="resolve-all-form" {% if pending_count == 0 %}style="display:none;"{% endif %}>
+    {% csrf_token %}
+    <button type="submit" class="btn btn-accent">Resolve all (<span id="resolve-all-count">{{ pending_count }}</span>)</button>
+  </form>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h3>Alerts with no linked device</h3>
+    <span class="card-sub">
+      {% if alerts.paginator.count %}SHOWING {{ alerts.start_index }}–{{ alerts.end_index }} OF {{ alerts.paginator.count }}{% else %}NO ALERTS{% endif %}
+    </span>
+  </div>
+  <div class="card-body" style="padding: 8px 0 4px;">
+    <table class="data-table"
+           data-can-manage-alerts="{{ can_manage_alerts|yesno:'true,false' }}"
+           data-resolve-url-template="{% url 'resolve_alert' 999999 %}">
+      <thead>
+        <tr><th>Time</th><th>Attack</th><th>Severity</th><th>Source IP</th><th>Confidence</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for a in alerts %}
+        <tr>
+          <td>{{ a.created_at|date:"M d, H:i" }}</td>
+          <td class="primary">{{ a.attack_type }}</td>
+          <td>
+            {% if a.severity == "High" %}<span class="badge badge-high">High</span>
+            {% elif a.severity == "Medium" %}<span class="badge badge-medium">Medium</span>
+            {% else %}<span class="badge badge-low">Low</span>{% endif %}
+          </td>
+          <td>{{ a.source_ip }}</td>
+          <td>{{ a.confidence|floatformat:1 }}%</td>
+          <td>
+            {% if a.status == "Resolved" %}<span class="badge badge-resolved">Resolved</span>
+            {% else %}<span class="badge badge-pending">Pending</span>{% endif %}
+          </td>
+          <td>
+            {% if a.status != "Resolved" and can_manage_alerts %}
+            <form method="post" action="{% url 'resolve_alert' a.id %}">
+              {% csrf_token %}
+              <button type="submit" class="btn">Resolve</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr class="empty-row"><td colspan="7">No unassigned alerts.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if alerts.paginator.num_pages > 1 %}
+  <div class="pagination">
+    {% if alerts.has_previous %}
+      <a class="page-link" href="?page={{ alerts.previous_page_number }}">← Prev</a>
+    {% else %}
+      <span class="page-link disabled">← Prev</span>
+    {% endif %}
+    <span class="page-status">Page {{ alerts.number }} of {{ alerts.paginator.num_pages }}</span>
+    {% if alerts.has_next %}
+      <a class="page-link" href="?page={{ alerts.next_page_number }}">Next →</a>
+    {% else %}
+      <span class="page-link disabled">Next →</span>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'Entron/js/live.js' %}"></script>
+<script>
+  const table = document.querySelector('table.data-table');
+  const CAN_MANAGE_ALERTS = table?.dataset.canManageAlerts === 'true';
+  const RESOLVE_URL_TEMPLATE = table?.dataset.resolveUrlTemplate; // e.g. /alerts/999999/resolve/
+
+  function severityBadge(sev) {
+    if (sev === 'High') return '<span class="badge badge-high">High</span>';
+    if (sev === 'Medium') return '<span class="badge badge-medium">Medium</span>';
+    return '<span class="badge badge-low">Low</span>';
+  }
+
+  function csrfToken() {
+    return document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1] || '';
+  }
+
+  document.addEventListener('entronx:alert', function (e) {
+    const a = e.detail;
+    if (a.device_id) return;  // this page is unassigned alerts only
+
+    const tbody = table.querySelector('tbody');
+    const emptyRow = tbody.querySelector('.empty-row');
+    if (emptyRow) emptyRow.remove();
+
+    const resolveUrl = RESOLVE_URL_TEMPLATE ? RESOLVE_URL_TEMPLATE.replace('999999', a.id) : '#';
+    const time = new Date(a.created_at).toLocaleString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${time}</td>
+      <td class="primary">${a.attack_type}</td>
+      <td>${severityBadge(a.severity)}</td>
+      <td>${a.source_ip}</td>
+      <td>${a.confidence.toFixed(1)}%</td>
+      <td><span class="badge badge-pending">Pending</span></td>
+      <td>${CAN_MANAGE_ALERTS ? `
+        <form method="post" action="${resolveUrl}">
+          <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken()}">
+          <button type="submit" class="btn">Resolve</button>
+        </form>` : ''}</td>
+    `;
+    tbody.insertBefore(row, tbody.firstChild);
+
+    const resolveAllForm = document.getElementById('resolve-all-form');
+    if (resolveAllForm) {
+      const countEl = document.getElementById('resolve-all-count');
+      countEl.textContent = (parseInt(countEl.textContent, 10) || 0) + 1;
+      resolveAllForm.style.display = '';
+    }
+  });
+
+  const resolveAllForm = document.getElementById('resolve-all-form');
+  if (resolveAllForm) {
+    resolveAllForm.addEventListener('submit', function (e) {
+      const count = document.getElementById('resolve-all-count').textContent;
+      if (!confirm(`Resolve all ${count} pending unassigned alert(s)?`)) {
+        e.preventDefault();
+      }
+    });
+  }
+</script>
+{% endblock %}

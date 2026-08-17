@@ -1,0 +1,33 @@
+{% extends "Entron/base_auth.html" %}
+
+{% block title %}Admin Sign In · IntrusionX{% endblock %}
+
+{% block brand_heading %}Watch your network.{% endblock %}
+{% block brand_copy %}Sign in to review live alerts, device health, and detection history across your organization.{% endblock %}
+
+{% block eyebrow %}Administrator access{% endblock %}
+{% block heading %}Sign in{% endblock %}
+{% block subtext %}Use your administrator username and password.{% endblock %}
+
+{% block form_content %}
+<form method="post" action="">
+  {% csrf_token %}
+
+  <div class="field">
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" placeholder="Your username" autocomplete="username" required autofocus>
+  </div>
+
+  <div class="field">
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" placeholder="Your password" autocomplete="current-password" required>
+  </div>
+
+  <button type="submit" class="btn-primary">Sign in</button>
+</form>
+{% endblock %}
+
+{% block foot_links %}
+<span>Setting up a new organization?</span>
+<a href="{% url 'company_login' %}">Company sign in</a>
+{% endblock %}

@@ -1,0 +1,140 @@
+{% extends "Entron/base_app.html" %}
+{% load static %}
+
+{% block title %}Devices · IntrusionX{% endblock %}
+{% block topbar_title %}Devices{% endblock %}
+
+{% block extra_head %}
+<style>
+  table.data-table{ width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.data-table th{
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    font-weight: 500;
+    padding: 0 14px 10px;
+  }
+  table.data-table td{
+    padding: 11px 14px;
+    border-top: 1px solid var(--border-soft);
+    color: var(--text-dim);
+  }
+  table.data-table td.primary{ color: var(--text); }
+  table.data-table tr:hover td{ background: var(--surface-raised); }
+  table.data-table tr.device-row{ cursor: pointer; }
+  .empty-row td{ text-align: center; color: var(--text-faint); padding: 30px 12px; }
+
+  .usage-bar{
+    width: 70px;
+    height: 5px;
+    border-radius: 4px;
+    background: var(--border-soft);
+    display: inline-block;
+    overflow: hidden;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+  .usage-bar-fill{ height: 100%; background: var(--accent); }
+  .usage-bar-fill.warn{ background: var(--flag); }
+  .usage-bar-fill.danger{ background: var(--danger); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-head">
+  <p class="eyebrow">Fleet</p>
+  <h1>Devices</h1>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h3>All devices</h3>
+    <span class="card-sub">{{ devices.paginator.count }} TOTAL · CLICK A ROW FOR DETAILS</span>
+  </div>
+  <div class="card-body" style="padding: 8px 0 4px;">
+    <table class="data-table">
+      <thead>
+        <tr><th>Device</th><th>Status</th><th>OS</th><th>CPU</th><th>RAM</th><th>Disk</th><th>IP Address</th><th>Last Seen</th></tr>
+      </thead>
+      <tbody>
+        {% for d in devices %}
+        <tr class="device-row" data-device-id="{{ d.device_id }}" onclick="window.location='{% url 'device_detail' d.device_id %}'">
+          <td class="primary">{{ d.name }}</td>
+          <td class="js-status">
+            {% if d.status %}<span class="badge badge-online">Online</span>
+            {% else %}<span class="badge badge-offline">Offline</span>{% endif %}
+          </td>
+          <td>{{ d.os }}</td>
+          <td class="js-cpu">
+            <span class="usage-bar"><span class="usage-bar-fill {% if d.cpu_usage > 85 %}danger{% elif d.cpu_usage > 60 %}warn{% endif %}" style="width: {{ d.cpu_usage }}%;"></span></span>{{ d.cpu_usage|floatformat:0 }}%
+          </td>
+          <td class="js-ram">
+            <span class="usage-bar"><span class="usage-bar-fill {% if d.ram_usage > 85 %}danger{% elif d.ram_usage > 60 %}warn{% endif %}" style="width: {{ d.ram_usage }}%;"></span></span>{{ d.ram_usage|floatformat:0 }}%
+          </td>
+          <td class="js-disk">
+            <span class="usage-bar"><span class="usage-bar-fill {% if d.disk_usage > 85 %}danger{% elif d.disk_usage > 60 %}warn{% endif %}" style="width: {{ d.disk_usage }}%;"></span></span>{{ d.disk_usage|floatformat:0 }}%
+          </td>
+          <td>{{ d.ip_address }}</td>
+          <td class="js-last-seen">{{ d.last_seen|date:"M d, H:i" }}</td>
+        </tr>
+        {% empty %}
+        <tr class="empty-row"><td colspan="8">No devices registered yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if devices.paginator.num_pages > 1 %}
+  <div class="pagination">
+    {% if devices.has_previous %}
+      <a class="page-link" href="?page={{ devices.previous_page_number }}">← Prev</a>
+    {% else %}
+      <span class="page-link disabled">← Prev</span>
+    {% endif %}
+    <span class="page-status">Page {{ devices.number }} of {{ devices.paginator.num_pages }}</span>
+    {% if devices.has_next %}
+      <a class="page-link" href="?page={{ devices.next_page_number }}">Next →</a>
+    {% else %}
+      <span class="page-link disabled">Next →</span>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'Entron/js/live.js' %}"></script>
+<script>
+  document.addEventListener('entronx:device', function (e) {
+    const d = e.detail;
+    const row = document.querySelector(`tr.device-row[data-device-id="${d.device_id}"]`);
+    if (!row) return;  // device not on this page (pagination) -- ignore
+
+    const statusCell = row.querySelector('.js-status');
+    if (statusCell) {
+      statusCell.innerHTML = d.status
+        ? '<span class="badge badge-online">Online</span>'
+        : '<span class="badge badge-offline">Offline</span>';
+    }
+
+    function setUsage(cell, value) {
+      if (!cell) return;
+      const fill = cell.querySelector('.usage-bar-fill');
+      fill.style.width = value + '%';
+      fill.classList.toggle('danger', value > 85);
+      fill.classList.toggle('warn', value > 60 && value <= 85);
+      cell.lastChild.textContent = Math.round(value) + '%';
+    }
+    setUsage(row.querySelector('.js-cpu'), d.cpu_usage);
+    setUsage(row.querySelector('.js-ram'), d.ram_usage);
+    setUsage(row.querySelector('.js-disk'), d.disk_usage);
+
+    const lastSeenCell = row.querySelector('.js-last-seen');
+    if (lastSeenCell) lastSeenCell.textContent = 'just now';
+  });
+</script>
+{% endblock %}

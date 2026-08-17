@@ -1,0 +1,567 @@
+{% extends "Entron/base_app.html" %}
+
+{% load static %}
+
+{% block title %}Dashboard · IntrusionX{% endblock %}
+
+{% block extra_head %}
+<style>
+  table.live-table tr.device-row{ cursor: pointer; }
+
+  .sev-pills{ display: flex; gap: 6px; }
+  .sev-pill{
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    padding: 2px 7px;
+    border-radius: 5px;
+    font-weight: 600;
+  }
+  .sev-pill.high{ color: var(--danger); background: rgba(239,90,90,0.10); }
+  .sev-pill.medium{ color: var(--flag); background: rgba(242,169,59,0.10); }
+  .sev-pill.low{ color: var(--accent); background: rgba(45,212,191,0.10); }
+  .sev-pill.zero{ color: var(--text-faint); background: rgba(82,96,108,0.10); }
+
+  .row-chevron{ color: var(--text-faint); text-align: right; }
+
+  .summary-grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+
+  .stat-card{
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+
+  .stat-card .stat-label{
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0 0 10px;
+  }
+
+  .stat-card .stat-value{
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  .stat-card.accent-danger .stat-value{ color: var(--danger); }
+  .stat-card.accent-flag .stat-value{ color: var(--flag); }
+  .stat-card.accent-teal .stat-value{ color: var(--accent); }
+
+  .charts-grid{
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .charts-grid.thirds{ grid-template-columns: 1fr 1fr 1fr; }
+
+  .chart-canvas-wrap{ position: relative; height: 220px; }
+
+  .panels-grid{
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  table.live-table{
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  table.live-table th{
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    font-weight: 500;
+    padding: 0 12px 10px;
+  }
+
+  table.live-table td{
+    padding: 10px 12px;
+    border-top: 1px solid var(--border-soft);
+    color: var(--text-dim);
+  }
+
+  table.live-table td.primary{ color: var(--text); }
+
+  table.live-table tr:hover td{ background: var(--surface-raised); }
+
+  .empty-row td{
+    text-align: center;
+    color: var(--text-faint);
+    padding: 24px 12px;
+  }
+
+  @media (max-width: 980px){
+    .charts-grid, .charts-grid.thirds, .panels-grid{ grid-template-columns: 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-head">
+  <p class="eyebrow">Overview</p>
+  <h1>Dashboard</h1>
+</div>
+
+<!-- ---------- Summary cards ---------- -->
+<div class="summary-grid">
+  <div class="stat-card accent-teal">
+    <p class="stat-label">Devices Online</p>
+    <p class="stat-value">{{ devices_online }}</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Devices Offline</p>
+    <p class="stat-value">{{ devices_offline }}</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Total Devices</p>
+    <p class="stat-value">{{ total_devices }}</p>
+  </div>
+  <div class="stat-card accent-danger">
+    <p class="stat-label">Active Threats</p>
+    <p class="stat-value">{{ active_threats }}</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Total Alerts</p>
+    <p class="stat-value">{{ total_alerts }}</p>
+  </div>
+  <div class="stat-card accent-flag">
+    <p class="stat-label">Today's Alerts</p>
+    <p class="stat-value">{{ todays_alerts }}</p>
+  </div>
+  <div class="stat-card accent-danger">
+    <p class="stat-label">Critical Alerts</p>
+    <p class="stat-value">{{ critical_alerts }}</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Average CPU Usage</p>
+    <p class="stat-value">{{ avg_cpu }}%</p>
+  </div>
+  <div class="stat-card">
+    <p class="stat-label">Average RAM Usage</p>
+    <p class="stat-value">{{ avg_ram }}%</p>
+  </div>
+</div>
+
+<!-- ---------- Charts row 1 ---------- -->
+<div class="charts-grid">
+  <div class="card">
+    <div class="card-head">
+      <h3>Attacks per Hour</h3>
+      <span class="card-sub">LAST 24H</span>
+    </div>
+    <div class="card-body">
+      <div class="chart-canvas-wrap"><canvas id="chart-attacks-hour"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Attack Distribution</h3>
+      <span class="card-sub">BY TYPE</span>
+    </div>
+    <div class="card-body">
+      <div class="chart-canvas-wrap"><canvas id="chart-attack-distribution"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ---------- Charts row 2 ---------- -->
+<div class="charts-grid thirds">
+  <div class="card">
+    <div class="card-head">
+      <h3>Attacks by Day</h3>
+      <span class="card-sub">7D</span>
+    </div>
+    <div class="card-body">
+      <div class="chart-canvas-wrap"><canvas id="chart-attacks-day"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Device Health</h3>
+      <span class="card-sub">SNAPSHOT</span>
+    </div>
+    <div class="card-body">
+      <div class="chart-canvas-wrap"><canvas id="chart-device-health"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Threat Timeline</h3>
+      <span class="card-sub">7D · BY SEVERITY</span>
+    </div>
+    <div class="card-body">
+      <div class="chart-canvas-wrap"><canvas id="chart-threat-timeline"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ---------- Live panels ---------- -->
+<div class="panels-grid">
+  <div class="card">
+    <div class="card-head">
+      <h3>Live Alerts</h3>
+      <span class="card-sub">BY DEVICE · TOP 10</span>
+    </div>
+    <div class="card-body" style="padding: 8px 0 4px;">
+      <table class="live-table"
+             data-device-alerts-url-template="{% url 'device_alerts_page' '00000000-0000-0000-0000-000000000000' %}"
+             data-unassigned-alerts-url="{% url 'unassigned_alerts_page' %}">
+        <thead>
+          <tr><th>Device</th><th>Total</th><th>Pending</th><th>By severity</th><th>Last alert</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for row in live_alert_devices %}
+          <tr class="device-row" data-device-id="{{ row.device__device_id|default:'' }}" onclick="window.location='{% if row.device__device_id %}{% url 'device_alerts_page' row.device__device_id %}{% else %}{% url 'unassigned_alerts_page' %}{% endif %}'">
+            <td class="primary js-alert-name">{{ row.device__name|default:"Unassigned" }}</td>
+            <td class="js-alert-total">{{ row.total }}</td>
+            <td class="js-alert-pending">
+              {% if row.pending > 0 %}<span class="badge badge-pending">{{ row.pending }} pending</span>
+              {% else %}<span class="badge badge-resolved">All resolved</span>{% endif %}
+            </td>
+            <td>
+              <div class="sev-pills">
+                <span class="sev-pill js-sev-high {% if row.high %}high{% else %}zero{% endif %}">H {{ row.high }}</span>
+                <span class="sev-pill js-sev-medium {% if row.medium %}medium{% else %}zero{% endif %}">M {{ row.medium }}</span>
+                <span class="sev-pill js-sev-low {% if row.low %}low{% else %}zero{% endif %}">L {{ row.low }}</span>
+              </div>
+            </td>
+            <td class="js-alert-last">{{ row.last_alert|date:"M d, H:i" }}</td>
+            <td class="row-chevron">→</td>
+          </tr>
+          {% empty %}
+          <tr class="empty-row"><td colspan="6">No alerts yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Recent Devices</h3>
+      <span class="card-sub">BY LAST SEEN</span>
+    </div>
+    <div class="card-body" style="padding: 8px 0 4px;">
+      <table class="live-table">
+        <thead>
+          <tr><th>Device</th><th>Status</th><th>Last Seen</th></tr>
+        </thead>
+        <tbody>
+          {% for d in recent_devices %}
+          <tr data-device-id="{{ d.device_id }}">
+            <td class="primary js-recent-name">{{ d.name }}</td>
+            <td class="js-recent-status">
+              {% if d.status %}<span class="badge badge-online">Online</span>
+              {% else %}<span class="badge badge-offline">Offline</span>{% endif %}
+            </td>
+            <td class="js-recent-lastseen">{{ d.last_seen|date:"M d, H:i" }}</td>
+          </tr>
+          {% empty %}
+          <tr class="empty-row"><td colspan="3">No devices registered yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{{ attacks_per_hour|json_script:"data-attacks-hour" }}
+{{ attacks_by_day|json_script:"data-attacks-day" }}
+{{ attack_distribution|json_script:"data-attack-distribution" }}
+{{ device_health|json_script:"data-device-health" }}
+{{ threat_timeline|json_script:"data-threat-timeline" }}
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script><script>
+  // NOTE: loaded from a public CDN for simplicity. For a security product,
+  // consider self-hosting Chart.js instead so the dashboard has zero
+  // external network dependencies.
+
+  const COLORS = {
+    text: "#8A96A3",
+    grid: "#1A2129",
+    teal: "#2DD4BF",
+    tealFill: "rgba(45,212,191,0.14)",
+    flag: "#F2A93B",
+    danger: "#EF5A5A",
+    faint: "#52606C",
+    palette: ["#2DD4BF", "#F2A93B", "#EF5A5A", "#60A5FA", "#C084FC", "#FB923C", "#34D399", "#F472B6"]
+  };
+
+  Chart.defaults.color = COLORS.text;
+  Chart.defaults.font.family = "'IBM Plex Sans', 'Inter', sans-serif";
+  Chart.defaults.font.size = 11;
+
+  function getData(id){
+    return JSON.parse(document.getElementById(id).textContent);
+  }
+
+  const gridOpts = { color: COLORS.grid, drawTicks: false };
+
+  // Attacks per hour -- line chart
+  const attacksHour = getData("data-attacks-hour");
+  new Chart(document.getElementById("chart-attacks-hour"), {
+    type: "line",
+    data: {
+      labels: attacksHour.labels,
+      datasets: [{
+        data: attacksHour.data,
+        borderColor: COLORS.teal,
+        backgroundColor: COLORS.tealFill,
+        fill: true,
+        tension: 0.35,
+        pointRadius: 0,
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: gridOpts },
+        y: { grid: gridOpts, beginAtZero: true, ticks: { precision: 0 } }
+      }
+    }
+  });
+
+  // Attack distribution -- doughnut
+  const distribution = getData("data-attack-distribution");
+  new Chart(document.getElementById("chart-attack-distribution"), {
+    type: "doughnut",
+    data: {
+      labels: distribution.labels,
+      datasets: [{
+        data: distribution.data,
+        backgroundColor: COLORS.palette,
+        borderColor: "#141B23",
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      cutout: "62%",
+      plugins: { legend: { position: "right", labels: { boxWidth: 10, padding: 12 } } }
+    }
+  });
+
+  // Attacks by day -- bar chart
+  const attacksDay = getData("data-attacks-day");
+  new Chart(document.getElementById("chart-attacks-day"), {
+    type: "bar",
+    data: {
+      labels: attacksDay.labels,
+      datasets: [{
+        data: attacksDay.data,
+        backgroundColor: COLORS.teal,
+        borderRadius: 4,
+        maxBarThickness: 28,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false } },
+        y: { grid: gridOpts, beginAtZero: true, ticks: { precision: 0 } }
+      }
+    }
+  });
+
+  // Device health -- donut (online vs offline snapshot)
+  const health = getData("data-device-health");
+  new Chart(document.getElementById("chart-device-health"), {
+    type: "doughnut",
+    data: {
+      labels: health.labels,
+      datasets: [{
+        data: health.data,
+        backgroundColor: [COLORS.teal, COLORS.faint],
+        borderColor: "#141B23",
+        borderWidth: 2,
+      }]
+    },
+    options: {
+      cutout: "62%",
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 10, padding: 12 } } }
+    }
+  });
+
+  // Threat timeline -- stacked bar by severity
+  const timeline = getData("data-threat-timeline");
+  const severityColors = { "Low": COLORS.teal, "Medium": COLORS.flag, "High": COLORS.danger };
+  new Chart(document.getElementById("chart-threat-timeline"), {
+    type: "bar",
+    data: {
+      labels: timeline.labels,
+      datasets: timeline.series.map(s => ({
+        label: s.label,
+        data: s.data,
+        backgroundColor: severityColors[s.label] || COLORS.faint,
+        borderRadius: 3,
+      }))
+    },
+    options: {
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 10, padding: 12 } } },
+      scales: {
+        x: { grid: { display: false }, stacked: true },
+        y: { grid: gridOpts, beginAtZero: true, stacked: true, ticks: { precision: 0 } }
+      }
+    }
+  });
+</script>
+<script src="{% static 'Entron/js/live.js' %}"></script>
+<script>
+  // Keep the dashboard's headline numbers and the two live tables in
+  // sync with incoming WebSocket events, without needing a page reload.
+  // Charts are left alone -- they cover fixed historical windows (24h/7d)
+  // and aren't worth rebuilding live; a refresh still updates those.
+
+  function getStatCard(labelText) {
+    const cards = document.querySelectorAll('.stat-card');
+    for (const card of cards) {
+      const label = card.querySelector('.stat-label');
+      if (label && label.textContent.trim() === labelText) return card;
+    }
+    return null;
+  }
+  function bumpStatCard(labelText, delta) {
+    const card = getStatCard(labelText);
+    if (!card) return;
+    const valueEl = card.querySelector('.stat-value');
+    const current = parseInt(valueEl.textContent.replace(/[^\d]/g, ''), 10) || 0;
+    valueEl.textContent = Math.max(0, current + delta);
+  }
+  function fmtTime(iso) {
+    const d = new Date(iso);
+    return d.toLocaleString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+
+  // ---------- Alerts ----------
+  document.addEventListener('entronx:alert', function (e) {
+    const a = e.detail;
+
+    bumpStatCard('Total Alerts', 1);
+    bumpStatCard("Today's Alerts", 1);
+    bumpStatCard('Active Threats', 1);
+    if (a.severity === 'High') bumpStatCard('Critical Alerts', 1);
+
+    // Update (or create) this device's row in the Live Alerts table.
+    const table = document.querySelector('.panels-grid .live-table');
+    const tbody = table.querySelector('tbody');
+    const key = a.device_id || '';
+    let row = tbody.querySelector(`tr.device-row[data-device-id="${key}"]`);
+
+    if (row) {
+      const totalEl = row.querySelector('.js-alert-total');
+      const newTotal = (parseInt(totalEl.textContent, 10) || 0) + 1;
+      totalEl.textContent = newTotal;
+
+      const pendingEl = row.querySelector('.js-alert-pending');
+      const pendingBadge = pendingEl.querySelector('.badge-pending');
+      const currentPending = pendingBadge ? (parseInt(pendingBadge.textContent, 10) || 0) : 0;
+      pendingEl.innerHTML = `<span class="badge badge-pending">${currentPending + 1} pending</span>`;
+
+      const sevClass = a.severity === 'High' ? 'js-sev-high' : a.severity === 'Medium' ? 'js-sev-medium' : 'js-sev-low';
+      const sevEl = row.querySelector(`.${sevClass}`);
+      if (sevEl) {
+        const label = sevEl.textContent.trim().charAt(0);
+        const count = (parseInt(sevEl.textContent.replace(/\D/g, ''), 10) || 0) + 1;
+        sevEl.textContent = `${label} ${count}`;
+        sevEl.classList.remove('zero');
+      }
+
+      row.querySelector('.js-alert-last').textContent = fmtTime(a.created_at);
+      tbody.insertBefore(row, tbody.firstChild);
+    } else {
+      const emptyRow = tbody.querySelector('.empty-row');
+      if (emptyRow) emptyRow.remove();
+
+      const sevPills = { High: 0, Medium: 0, Low: 0 };
+      sevPills[a.severity] = 1;
+      const newRow = document.createElement('tr');
+      newRow.className = 'device-row';
+      newRow.dataset.deviceId = key;
+      const devTemplate = table.dataset.deviceAlertsUrlTemplate;
+      const unassignedUrl = table.dataset.unassignedAlertsUrl;
+      newRow.onclick = function () {
+        window.location = key
+          ? devTemplate.replace('00000000-0000-0000-0000-000000000000', key)
+          : unassignedUrl;
+      };
+      newRow.innerHTML = `
+        <td class="primary js-alert-name">${a.device_name || 'Unassigned'}</td>
+        <td class="js-alert-total">1</td>
+        <td class="js-alert-pending"><span class="badge badge-pending">1 pending</span></td>
+        <td><div class="sev-pills">
+          <span class="sev-pill js-sev-high ${sevPills.High ? 'high' : 'zero'}">H ${sevPills.High}</span>
+          <span class="sev-pill js-sev-medium ${sevPills.Medium ? 'medium' : 'zero'}">M ${sevPills.Medium}</span>
+          <span class="sev-pill js-sev-low ${sevPills.Low ? 'low' : 'zero'}">L ${sevPills.Low}</span>
+        </div></td>
+        <td class="js-alert-last">${fmtTime(a.created_at)}</td>
+        <td class="row-chevron">→</td>
+      `;
+      tbody.insertBefore(newRow, tbody.firstChild);
+    }
+  });
+
+  // ---------- Devices ----------
+  document.addEventListener('entronx:device', function (e) {
+    const d = e.detail;
+    const table = document.querySelector('.panels-grid table.live-table:last-of-type') ||
+                  document.querySelectorAll('.panels-grid .live-table')[1];
+    const tbody = table.querySelector('tbody');
+    let row = tbody.querySelector(`tr[data-device-id="${d.device_id}"]`);
+    const statusHtml = d.status
+      ? '<span class="badge badge-online">Online</span>'
+      : '<span class="badge badge-offline">Offline</span>';
+
+    if (row) {
+      row.querySelector('.js-recent-status').innerHTML = statusHtml;
+      row.querySelector('.js-recent-lastseen').textContent = 'just now';
+      tbody.insertBefore(row, tbody.firstChild);
+    } else {
+      const emptyRow = tbody.querySelector('.empty-row');
+      if (emptyRow) emptyRow.remove();
+      const newRow = document.createElement('tr');
+      newRow.dataset.deviceId = d.device_id;
+      newRow.innerHTML = `
+        <td class="primary js-recent-name">${d.name}</td>
+        <td class="js-recent-status">${statusHtml}</td>
+        <td class="js-recent-lastseen">just now</td>
+      `;
+      tbody.insertBefore(newRow, tbody.firstChild);
+      // keep the list to a reasonable length
+      const rows = tbody.querySelectorAll('tr[data-device-id]');
+      if (rows.length > 10) rows[rows.length - 1].remove();
+    }
+
+    // Note: Devices Online/Offline/Total and Avg CPU/RAM stat cards are
+    // aggregates over the whole fleet, which the browser doesn't have --
+    // only this one device's data arrives per event. Updating those
+    // accurately would need either a full-fleet snapshot pushed from the
+    // server or a dedicated summary endpoint; left as a refresh-only
+    // value for now rather than showing a number we can't guarantee is right.
+  });
+</script>
+{% endblock %}

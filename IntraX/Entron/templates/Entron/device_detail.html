@@ -1,0 +1,260 @@
+{% extends "Entron/base_app.html" %}
+{% load static %}
+
+{% block title %}{{ device.name }} · IntrusionX{% endblock %}
+{% block topbar_title %}Devices{% endblock %}
+
+{% block extra_head %}
+<style>
+  .breadcrumb{ font-size: 12.5px; color: var(--text-faint); margin-bottom: 6px; }
+  .breadcrumb a{ color: var(--accent); }
+  .device-head{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .info-grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+    margin-bottom: 26px;
+  }
+  .stat-card{
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .stat-card .stat-label{
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0 0 10px;
+  }
+  .stat-card .stat-value{
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+
+  table.data-table{ width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.data-table th{
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    font-weight: 500;
+    padding: 0 14px 10px;
+  }
+  table.data-table td{
+    padding: 11px 14px;
+    border-top: 1px solid var(--border-soft);
+    color: var(--text-dim);
+  }
+  table.data-table td.primary{ color: var(--text); }
+  table.data-table tr:hover td{ background: var(--surface-raised); }
+
+  .all-secure{
+    text-align: center;
+    padding: 60px 20px;
+  }
+  .all-secure .secure-badge{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: rgba(74,222,128,0.10);
+    margin-bottom: 18px;
+  }
+  .all-secure .secure-badge svg{ width: 26px; height: 26px; color: var(--success); }
+  .all-secure h3{ margin: 0 0 6px; font-size: 17px; color: var(--text); }
+  .all-secure p{ margin: 0; color: var(--text-faint); font-size: 13px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<p class="breadcrumb"><a href="{% url 'devices_page' %}">← All devices</a></p>
+
+<div class="device-head">
+  <div>
+    <p class="eyebrow">Device</p>
+    <h1>{{ device.name }}</h1>
+  </div>
+  <span class="js-status">
+  {% if device.status %}<span class="badge badge-online">Online</span>
+  {% else %}<span class="badge badge-offline">Offline</span>{% endif %}
+  </span>
+</div>
+
+<div class="info-grid" data-device-id="{{ device.device_id }}">
+  <div class="stat-card"><p class="stat-label">OS</p><p class="stat-value" style="font-size:15px;">{{ device.os }}</p></div>
+  <div class="stat-card"><p class="stat-label">CPU</p><p class="stat-value" style="font-size:15px;">{{ device.cpu }}</p></div>
+  <div class="stat-card"><p class="stat-label">RAM</p><p class="stat-value" style="font-size:15px;">{{ device.ram }}</p></div>
+  <div class="stat-card"><p class="stat-label">IP Address</p><p class="stat-value" style="font-size:15px;">{{ device.ip_address }}</p></div>
+  <div class="stat-card js-cpu"><p class="stat-label">CPU Usage</p><p class="stat-value">{{ device.cpu_usage|floatformat:0 }}%</p></div>
+  <div class="stat-card js-ram"><p class="stat-label">RAM Usage</p><p class="stat-value">{{ device.ram_usage|floatformat:0 }}%</p></div>
+  <div class="stat-card js-disk"><p class="stat-label">Disk Usage</p><p class="stat-value">{{ device.disk_usage|floatformat:0 }}%</p></div>
+  <div class="stat-card js-last-seen"><p class="stat-label">Last Seen</p><p class="stat-value" style="font-size:15px;">{{ device.last_seen|date:"M d, H:i" }}</p></div>
+</div>
+
+{% url 'resolve_alert' 999999 as resolve_url_template %}
+<div id="alerts-section" data-can-manage-alerts="{{ can_manage_alerts|yesno:'true,false' }}" data-resolve-url-template="{{ resolve_url_template }}">
+{% if is_secure %}
+<div class="card all-secure">
+  <span class="secure-badge">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
+  </span>
+  <h3>All is secure</h3>
+  <p>No pending alerts for this device{% if total_alert_count > 0 %} — all {{ total_alert_count }} past alert(s) are resolved{% endif %}.</p>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-head">
+    <h3>Alerts for this device</h3>
+    <span class="card-sub"><span class="js-pending-count">{{ pending_count }}</span> PENDING</span>
+  </div>
+  <div class="card-body" style="padding: 8px 0 4px;">
+    <table class="data-table">
+      <thead>
+        <tr><th>Time</th><th>Attack</th><th>Severity</th><th>Source IP</th><th>Confidence</th><th>Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for a in alerts %}
+        <tr>
+          <td>{{ a.created_at|date:"M d, H:i" }}</td>
+          <td class="primary">{{ a.attack_type }}</td>
+          <td>
+            {% if a.severity == "High" %}<span class="badge badge-high">High</span>
+            {% elif a.severity == "Medium" %}<span class="badge badge-medium">Medium</span>
+            {% else %}<span class="badge badge-low">Low</span>{% endif %}
+          </td>
+          <td>{{ a.source_ip }}</td>
+          <td>{{ a.confidence|floatformat:1 }}%</td>
+          <td>
+            {% if a.status == "Resolved" %}<span class="badge badge-resolved">Resolved</span>
+            {% else %}<span class="badge badge-pending">Pending</span>{% endif %}
+          </td>
+          <td>
+            {% if a.status != "Resolved" and can_manage_alerts %}
+            <form method="post" action="{% url 'resolve_alert' a.id %}">
+              {% csrf_token %}
+              <button type="submit" class="btn">Resolve</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'Entron/js/live.js' %}"></script>
+<script>
+  const PAGE_DEVICE_ID = document.querySelector('.info-grid')?.dataset.deviceId;
+
+  document.addEventListener('entronx:device', function (e) {
+    const d = e.detail;
+    if (!PAGE_DEVICE_ID || d.device_id !== PAGE_DEVICE_ID) return;  // not this device
+
+    const statusEl = document.querySelector('.js-status');
+    if (statusEl) {
+      statusEl.innerHTML = d.status
+        ? '<span class="badge badge-online">Online</span>'
+        : '<span class="badge badge-offline">Offline</span>';
+    }
+
+    function setUsage(selector, value) {
+      const card = document.querySelector(selector);
+      if (!card) return;
+      card.querySelector('.stat-value').textContent = Math.round(value) + '%';
+    }
+    setUsage('.js-cpu', d.cpu_usage);
+    setUsage('.js-ram', d.ram_usage);
+    setUsage('.js-disk', d.disk_usage);
+
+    const lastSeen = document.querySelector('.js-last-seen .stat-value');
+    if (lastSeen) lastSeen.textContent = 'just now';
+  });
+
+  // New alert for this device -- rebuild the "all secure" card into a
+  // real alerts table if this is the first alert, otherwise insert a
+  // new row and bump the pending count.
+  function csrfToken() {
+    return document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1] || '';
+  }
+  function severityBadge(sev) {
+    if (sev === 'High') return '<span class="badge badge-high">High</span>';
+    if (sev === 'Medium') return '<span class="badge badge-medium">Medium</span>';
+    return '<span class="badge badge-low">Low</span>';
+  }
+
+  document.addEventListener('entronx:alert', function (e) {
+    if (!PAGE_DEVICE_ID || e.detail.device_id !== PAGE_DEVICE_ID) return;
+    const a = e.detail;
+    const section = document.getElementById('alerts-section');
+    const canManageAlerts = section.dataset.canManageAlerts === 'true';
+    const resolveUrl = section.dataset.resolveUrlTemplate.replace('999999', a.id);
+    const time = new Date(a.created_at).toLocaleString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+
+    const rowHtml = `
+      <tr>
+        <td>${time}</td>
+        <td class="primary">${a.attack_type}</td>
+        <td>${severityBadge(a.severity)}</td>
+        <td>${a.source_ip}</td>
+        <td>${a.confidence.toFixed(1)}%</td>
+        <td><span class="badge badge-pending">Pending</span></td>
+        <td>${canManageAlerts ? `
+          <form method="post" action="${resolveUrl}">
+            <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken()}">
+            <button type="submit" class="btn">Resolve</button>
+          </form>` : ''}</td>
+      </tr>`;
+
+    const secureCard = section.querySelector('.all-secure');
+    if (secureCard) {
+      // First alert for a previously-secure device -- build the table fresh.
+      section.innerHTML = `
+        <div class="card">
+          <div class="card-head">
+            <h3>Alerts for this device</h3>
+            <span class="card-sub"><span class="js-pending-count">1</span> PENDING</span>
+          </div>
+          <div class="card-body" style="padding: 8px 0 4px;">
+            <table class="data-table">
+              <thead>
+                <tr><th>Time</th><th>Attack</th><th>Severity</th><th>Source IP</th><th>Confidence</th><th>Status</th><th></th></tr>
+              </thead>
+              <tbody>${rowHtml}</tbody>
+            </table>
+          </div>
+        </div>`;
+      return;
+    }
+
+    const tbody = section.querySelector('table.data-table tbody');
+    if (!tbody) return;
+    tbody.insertAdjacentHTML('afterbegin', rowHtml);
+    const pendingEl = section.querySelector('.js-pending-count');
+    if (pendingEl) pendingEl.textContent = (parseInt(pendingEl.textContent, 10) || 0) + 1;
+  });
+</script>
+{% endblock %}

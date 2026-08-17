@@ -1,0 +1,224 @@
+{% extends "Entron/base_app.html" %}
+{% load static %}
+
+{% block title %}Alerts · IntrusionX{% endblock %}
+{% block topbar_title %}Alerts{% endblock %}
+
+{% block extra_head %}
+<style>
+  .filter-bar{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+    flex-wrap: wrap;
+  }
+  table.data-table{ width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.data-table th{
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    font-weight: 500;
+    padding: 0 14px 10px;
+  }
+  table.data-table td{
+    padding: 12px 14px;
+    border-top: 1px solid var(--border-soft);
+    color: var(--text-dim);
+  }
+  table.data-table td.primary{ color: var(--text); font-weight: 600; }
+  table.data-table tr.device-row{ cursor: pointer; }
+  table.data-table tr.device-row:hover td{ background: var(--surface-raised); }
+  .empty-row td{ text-align: center; color: var(--text-faint); padding: 30px 12px; }
+
+  .sev-pills{ display: flex; gap: 6px; }
+  .sev-pill{
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    padding: 2px 7px;
+    border-radius: 5px;
+    font-weight: 600;
+  }
+  .sev-pill.high{ color: var(--danger); background: rgba(239,90,90,0.10); }
+  .sev-pill.medium{ color: var(--flag); background: rgba(242,169,59,0.10); }
+  .sev-pill.low{ color: var(--accent); background: rgba(45,212,191,0.10); }
+  .sev-pill.zero{ color: var(--text-faint); background: rgba(82,96,108,0.10); }
+
+  .row-chevron{ color: var(--text-faint); text-align: right; }
+
+  .unassigned-card{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 16px;
+    padding: 14px 18px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-head">
+  <p class="eyebrow">Detection log</p>
+  <h1>Alerts</h1>
+</div>
+
+<form method="get" class="filter-bar">
+  <select name="device" class="select-filter" onchange="this.form.submit()">
+    <option value="" {% if not device_filter %}selected{% endif %}>All devices</option>
+    {% for d in all_devices %}
+      <option value="{{ d.device_id }}" {% if device_filter == d.device_id|stringformat:"s" %}selected{% endif %}>{{ d.name }}</option>
+    {% endfor %}
+  </select>
+  <select name="severity" class="select-filter" onchange="this.form.submit()">
+    <option value="" {% if not severity_filter %}selected{% endif %}>All severities</option>
+    <option value="Low" {% if severity_filter == "Low" %}selected{% endif %}>Low</option>
+    <option value="Medium" {% if severity_filter == "Medium" %}selected{% endif %}>Medium</option>
+    <option value="High" {% if severity_filter == "High" %}selected{% endif %}>High</option>
+  </select>
+  <select name="status" class="select-filter" onchange="this.form.submit()">
+    <option value="" {% if not status_filter %}selected{% endif %}>All statuses</option>
+    <option value="Pending" {% if status_filter == "Pending" %}selected{% endif %}>Pending</option>
+    <option value="Resolved" {% if status_filter == "Resolved" %}selected{% endif %}>Resolved</option>
+  </select>
+</form>
+
+<div class="card">
+  <div class="card-head">
+    <h3>Devices with alerts</h3>
+    <span class="card-sub">CLICK A ROW FOR FULL HISTORY</span>
+  </div>
+  <div class="card-body" style="padding: 8px 0 4px;">
+    <table class="data-table" data-device-alerts-url-template="{% url 'device_alerts_page' '00000000-0000-0000-0000-000000000000' %}">
+      <thead>
+        <tr><th>Device</th><th>Total</th><th>Pending</th><th>By severity</th><th>Last alert</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for row in device_rows %}
+        <tr class="device-row" data-device-id="{{ row.device__device_id }}" onclick="window.location='{% url 'device_alerts_page' row.device__device_id %}'">
+          <td class="primary js-alert-name">{{ row.device__name }}</td>
+          <td class="js-alert-total">{{ row.total }}</td>
+          <td class="js-alert-pending">
+            {% if row.pending > 0 %}<span class="badge badge-pending">{{ row.pending }} pending</span>
+            {% else %}<span class="badge badge-resolved">All resolved</span>{% endif %}
+          </td>
+          <td>
+            <div class="sev-pills">
+              <span class="sev-pill js-sev-high {% if row.high %}high{% else %}zero{% endif %}">H {{ row.high }}</span>
+              <span class="sev-pill js-sev-medium {% if row.medium %}medium{% else %}zero{% endif %}">M {{ row.medium }}</span>
+              <span class="sev-pill js-sev-low {% if row.low %}low{% else %}zero{% endif %}">L {{ row.low }}</span>
+            </div>
+          </td>
+          <td class="js-alert-last">{{ row.last_alert|date:"M d, H:i" }}</td>
+          <td class="row-chevron">→</td>
+        </tr>
+        {% empty %}
+        <tr class="empty-row"><td colspan="6">No devices match this filter.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card unassigned-card" id="unassigned-card" {% if unassigned_count == 0 %}style="display:none;"{% endif %}>
+  <div>
+    <p style="margin:0 0 4px; font-weight:600;">Unassigned alerts</p>
+    <p style="margin:0; font-size:12.5px; color: var(--text-faint);" id="unassigned-summary">{{ unassigned_count }} alert(s) with no linked device, {{ unassigned_pending }} pending</p>
+  </div>
+  <a class="btn" href="{% url 'unassigned_alerts_page' %}">View</a>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'Entron/js/live.js' %}"></script>
+<script>
+  const filterForm = document.querySelector('form.filter-bar');
+  const activeDevice = filterForm?.device.value || '';
+  const activeSeverity = filterForm?.severity.value || '';
+  const activeStatus = filterForm?.status.value || '';
+
+  function fmtTime(iso) {
+    const d = new Date(iso);
+    return d.toLocaleString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+
+  document.addEventListener('entronx:alert', function (e) {
+    const a = e.detail;
+
+    // Respect the current filters -- a new alert that wouldn't match
+    // what's currently shown shouldn't silently appear in the table.
+    // (New alerts are always status "Pending".)
+    if (activeStatus && activeStatus !== 'Pending') return;
+    if (activeSeverity && activeSeverity !== a.severity) return;
+    if (activeDevice && activeDevice !== (a.device_id || '')) return;
+
+    if (!a.device_id) {
+      // Unassigned alert -- update/create the unassigned-alerts card.
+      const card = document.getElementById('unassigned-card');
+      const summary = document.getElementById('unassigned-summary');
+      const match = summary.textContent.match(/(\d+) alert\(s\).*?(\d+) pending/);
+      const total = (match ? parseInt(match[1], 10) : 0) + 1;
+      const pending = (match ? parseInt(match[2], 10) : 0) + 1;
+      summary.textContent = `${total} alert(s) with no linked device, ${pending} pending`;
+      card.style.display = '';
+      return;
+    }
+
+    const table = document.querySelector('table.data-table');
+    const tbody = table.querySelector('tbody');
+    let row = tbody.querySelector(`tr.device-row[data-device-id="${a.device_id}"]`);
+
+    if (row) {
+      const totalEl = row.querySelector('.js-alert-total');
+      totalEl.textContent = (parseInt(totalEl.textContent, 10) || 0) + 1;
+
+      const pendingEl = row.querySelector('.js-alert-pending');
+      const pendingBadge = pendingEl.querySelector('.badge-pending');
+      const currentPending = pendingBadge ? (parseInt(pendingBadge.textContent, 10) || 0) : 0;
+      pendingEl.innerHTML = `<span class="badge badge-pending">${currentPending + 1} pending</span>`;
+
+      const sevClass = a.severity === 'High' ? 'js-sev-high' : a.severity === 'Medium' ? 'js-sev-medium' : 'js-sev-low';
+      const sevEl = row.querySelector(`.${sevClass}`);
+      if (sevEl) {
+        const label = sevEl.textContent.trim().charAt(0);
+        const count = (parseInt(sevEl.textContent.replace(/\D/g, ''), 10) || 0) + 1;
+        sevEl.textContent = `${label} ${count}`;
+        sevEl.classList.remove('zero');
+      }
+
+      row.querySelector('.js-alert-last').textContent = fmtTime(a.created_at);
+      tbody.insertBefore(row, tbody.firstChild);
+    } else {
+      const emptyRow = tbody.querySelector('.empty-row');
+      if (emptyRow) emptyRow.remove();
+
+      const sevPills = { High: 0, Medium: 0, Low: 0 };
+      sevPills[a.severity] = 1;
+      const devTemplate = table.dataset.deviceAlertsUrlTemplate;
+      const url = devTemplate.replace('00000000-0000-0000-0000-000000000000', a.device_id);
+
+      const newRow = document.createElement('tr');
+      newRow.className = 'device-row';
+      newRow.dataset.deviceId = a.device_id;
+      newRow.onclick = function () { window.location = url; };
+      newRow.innerHTML = `
+        <td class="primary js-alert-name">${a.device_name || 'Unknown device'}</td>
+        <td class="js-alert-total">1</td>
+        <td class="js-alert-pending"><span class="badge badge-pending">1 pending</span></td>
+        <td><div class="sev-pills">
+          <span class="sev-pill js-sev-high ${sevPills.High ? 'high' : 'zero'}">H ${sevPills.High}</span>
+          <span class="sev-pill js-sev-medium ${sevPills.Medium ? 'medium' : 'zero'}">M ${sevPills.Medium}</span>
+          <span class="sev-pill js-sev-low ${sevPills.Low ? 'low' : 'zero'}">L ${sevPills.Low}</span>
+        </div></td>
+        <td class="js-alert-last">${fmtTime(a.created_at)}</td>
+        <td class="row-chevron">→</td>
+      `;
+      tbody.insertBefore(newRow, tbody.firstChild);
+    }
+  });
+</script>
+{% endblock %}

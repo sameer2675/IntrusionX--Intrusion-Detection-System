@@ -1,0 +1,415 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}IntrusionX{% endblock %}</title>
+<style>
+  :root{
+    --bg: #0B0F14;
+    --panel: #0E141B;
+    --surface: #141B23;
+    --surface-raised: #182029;
+    --border: #212B35;
+    --border-soft: #1A2129;
+    --text: #E7EDF3;
+    --text-dim: #8A96A3;
+    --text-faint: #52606C;
+    --accent: #2DD4BF;
+    --accent-dim: #1B7A70;
+    --flag: #F2A93B;
+    --danger: #EF5A5A;
+    --danger-bg: rgba(239, 90, 90, 0.08);
+    --success: #4ADE80;
+    --font-mono: "IBM Plex Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --font-sans: "IBM Plex Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  *{ box-sizing: border-box; }
+
+  html, body{
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+  }
+
+  body{
+    display: grid;
+    grid-template-columns: minmax(340px, 42%) 1fr;
+    min-height: 100vh;
+  }
+  .brand-panel{
+    position: relative;
+    background:
+      radial-gradient(circle at 15% 8%, rgba(45,212,191,0.10), transparent 55%),
+      var(--panel);
+    border-right: 1px solid var(--border-soft);
+    padding: 48px 44px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+  }
+
+  .brand-mark{
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .brand-glyph{
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--accent-dim);
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+  }
+
+  .brand-glyph::before{
+    content: "";
+    width: 10px;
+    height: 10px;
+    background: var(--accent);
+    border-radius: 2px;
+    box-shadow: 0 0 12px rgba(45,212,191,0.65);
+  }
+
+  .brand-name{
+    font-family: var(--font-mono);
+    font-size: 15px;
+    letter-spacing: 0.04em;
+    color: var(--text);
+  }
+
+  .brand-name b{ color: var(--accent); font-weight: 600; }
+
+  .brand-copy{
+    margin-top: 56px;
+    max-width: 340px;
+  }
+
+  .brand-copy h1{
+    font-family: var(--font-sans);
+    font-size: 28px;
+    line-height: 1.28;
+    font-weight: 600;
+    margin: 0 0 14px;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+
+  .brand-copy p{
+    font-size: 14.5px;
+    line-height: 1.65;
+    color: var(--text-dim);
+    margin: 0;
+  }
+
+  .flow-trace{
+    margin-top: 52px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: rgba(20, 27, 35, 0.5);
+    padding: 18px 18px 14px;
+  }
+
+  .flow-trace-head{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+
+  .flow-trace-head .dot{
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    display: inline-block;
+    margin-right: 6px;
+    box-shadow: 0 0 6px rgba(45,212,191,0.8);
+    animation: pulse-dot 2.4s ease-in-out infinite;
+  }
+
+  .lane{
+    position: relative;
+    height: 14px;
+    margin-bottom: 10px;
+    border-bottom: 1px dashed var(--border-soft);
+  }
+
+  .lane:last-child{ margin-bottom: 0; }
+
+  .blip{
+    position: absolute;
+    top: 50%;
+    width: 6px;
+    height: 6px;
+    margin-top: -3px;
+    border-radius: 1px;
+    background: var(--accent);
+    opacity: 0.85;
+    animation-name: travel;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+
+  .blip.flag{
+    background: var(--flag);
+    width: 7px; height: 7px; margin-top: -3.5px;
+    box-shadow: 0 0 10px rgba(242,169,59,0.7);
+  }
+
+  .lane:nth-child(1) .blip{ animation-duration: 5.2s; }
+  .lane:nth-child(2) .blip{ animation-duration: 6.6s; }
+  .lane:nth-child(3) .blip{ animation-duration: 4.4s; }
+
+  .lane .blip:nth-child(1){ animation-delay: 0s; }
+  .lane .blip:nth-child(2){ animation-delay: -2.1s; }
+  .lane .blip:nth-child(3){ animation-delay: -3.6s; }
+
+  @keyframes travel{
+    from{ left: -3%; opacity: 0; }
+    5%{ opacity: 0.85; }
+    95%{ opacity: 0.85; }
+    to{ left: 100%; opacity: 0; }
+  }
+
+  @keyframes pulse-dot{
+    0%, 100%{ opacity: 1; }
+    50%{ opacity: 0.35; }
+  }
+
+  .flow-trace-foot{
+    margin-top: 12px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-faint);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .blip, .flow-trace-head .dot{ animation: none !important; opacity: 0.7; }
+  }
+
+  .form-panel{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+  }
+
+  .form-card{
+    width: 100%;
+    max-width: 380px;
+  }
+
+  .eyebrow{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+
+  .form-card h2{
+    font-size: 23px;
+    font-weight: 600;
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+  }
+
+  .form-card .subtext{
+    font-size: 13.5px;
+    color: var(--text-dim);
+    margin: 0 0 30px;
+    line-height: 1.55;
+  }
+
+  .field{
+    margin-bottom: 18px;
+  }
+
+  .field label{
+    display: block;
+    font-size: 12.5px;
+    color: var(--text-dim);
+    margin-bottom: 7px;
+    font-weight: 500;
+  }
+
+  .field-row{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  input[type="text"],
+  input[type="email"],
+  input[type="password"]{
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    padding: 11px 13px;
+    border-radius: 7px;
+    outline: none;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+
+  input::placeholder{ color: var(--text-faint); }
+
+  input:hover{ border-color: #2B3744; }
+
+  input:focus{
+    border-color: var(--accent);
+    background: var(--surface-raised);
+    box-shadow: 0 0 0 3px rgba(45,212,191,0.14);
+  }
+
+  .btn-primary{
+    width: 100%;
+    background: var(--accent);
+    color: #06231F;
+    border: none;
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 14.5px;
+    padding: 12px 16px;
+    border-radius: 7px;
+    cursor: pointer;
+    margin-top: 6px;
+    transition: filter 0.15s ease, transform 0.1s ease;
+  }
+
+  .btn-primary:hover{ filter: brightness(1.08); }
+  .btn-primary:active{ transform: translateY(1px); }
+
+  .btn-primary:focus-visible,
+  a:focus-visible{
+    outline: 2px solid var(--flag);
+    outline-offset: 2px;
+  }
+
+  .messages{
+    list-style: none;
+    padding: 0;
+    margin: 0 0 20px;
+  }
+
+  .messages li{
+    font-size: 13px;
+    padding: 10px 13px;
+    border-radius: 7px;
+    margin-bottom: 8px;
+    border: 1px solid rgba(239,90,90,0.35);
+    background: var(--danger-bg);
+    color: #FCA5A5;
+  }
+
+  .messages li.success{
+    border-color: rgba(74,222,128,0.35);
+    background: rgba(74,222,128,0.08);
+    color: #86EFAC;
+  }
+
+  .foot-links{
+    margin-top: 26px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-soft);
+    font-size: 13px;
+    color: var(--text-dim);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .foot-links a{
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .foot-links a:hover{ text-decoration: underline; }
+
+  .field-hint{
+    font-size: 11.5px;
+    color: var(--text-faint);
+    margin-top: 6px;
+  }
+
+  @media (max-width: 860px){
+    body{ grid-template-columns: 1fr; }
+    .brand-panel{
+      border-right: none;
+      border-bottom: 1px solid var(--border-soft);
+      padding: 32px 24px;
+    }
+    .brand-copy{ margin-top: 30px; }
+    .flow-trace{ margin-top: 28px; }
+  }
+</style>
+</head>
+<body>
+
+  <aside class="brand-panel">
+    <div>
+      <div class="brand-mark">
+        <span class="brand-glyph"></span>
+        <span class="brand-name"><b>Intrusion</b>X</span>
+      </div>
+
+      <div class="brand-copy">
+        <h1>{% block brand_heading %}Every flow, watched.{% endblock %}</h1>
+        <p>{% block brand_copy %}Live traffic analysis, on-device inference, and alerting for the networks you're responsible for.{% endblock %}</p>
+      </div>
+    </div>
+
+    <div class="flow-trace" aria-hidden="true">
+      <div class="flow-trace-head"><span><span class="dot"></span>LIVE FLOW MONITOR</span><span>3 SENSORS</span></div>
+      <div class="lane"><span class="blip"></span><span class="blip"></span><span class="blip"></span></div>
+      <div class="lane"><span class="blip"></span><span class="blip flag"></span><span class="blip"></span></div>
+      <div class="lane"><span class="blip"></span><span class="blip"></span><span class="blip"></span></div>
+      <div class="flow-trace-foot"><span>TCP · UDP</span><span>0 ACTIVE ALERTS</span></div>
+    </div>
+  </aside>
+
+  <main class="form-panel">
+    <div class="form-card">
+      <p class="eyebrow">{% block eyebrow %}Access{% endblock %}</p>
+      <h2>{% block heading %}Sign in{% endblock %}</h2>
+      <p class="subtext">{% block subtext %}{% endblock %}</p>
+
+      {% if messages %}
+      <ul class="messages">
+        {% for message in messages %}
+          <li class="{{ message.tags }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      {% block form_content %}{% endblock %}
+
+      <div class="foot-links">
+        {% block foot_links %}{% endblock %}
+      </div>
+    </div>
+  </main>
+
+</body>
+</html>

@@ -1,0 +1,147 @@
+{% extends "Entron/base_app.html" %}
+
+{% block title %}Permission Manager · IntrusionX{% endblock %}
+{% block topbar_title %}Permission Manager{% endblock %}
+
+{% block extra_head %}
+<style>
+  table.data-table{ width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.data-table th{
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    font-weight: 500;
+    padding: 0 14px 10px;
+  }
+  table.data-table td{
+    padding: 11px 14px;
+    border-top: 1px solid var(--border-soft);
+    color: var(--text-dim);
+    vertical-align: top;
+  }
+  table.data-table td.primary{ color: var(--text); }
+  table.data-table tr:hover td{ background: var(--surface-raised); }
+  .empty-row td{ text-align: center; color: var(--text-faint); padding: 30px 12px; }
+
+  .perm-toggle-btn{ white-space: nowrap; }
+
+  tr.perm-row td{
+    padding: 0 14px;
+    border-top: none;
+    background: var(--surface-raised);
+  }
+  tr.perm-row.open td{ padding: 16px 14px 18px; border-top: 1px solid var(--border-soft); }
+
+  .perm-panel{
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  .perm-checks{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px 24px;
+    font-size: 12.5px;
+    flex: 1;
+  }
+  .perm-checks label{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+  .perm-checks input[type="checkbox"]{
+    accent-color: var(--accent);
+    width: 15px;
+    height: 15px;
+  }
+  .actions-col{ display: flex; gap: 8px; align-items: flex-start; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-head" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+  <div>
+    <p class="eyebrow">Administration</p>
+    <h1>Permission Manager</h1>
+  </div>
+  <a class="btn btn-accent" href="{% url 'register' %}">+ Add administrator</a>
+</div>
+
+<div class="card">
+  <div class="card-head">
+    <h3>Administrator accounts</h3>
+    <span class="card-sub">{{ admins|length }} TOTAL</span>
+  </div>
+  <div class="card-body" style="padding: 8px 0 4px;">
+    <table class="data-table">
+      <thead>
+        <tr><th>Name</th><th>Username</th><th>Email</th><th>Joined</th><th>Access</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for admin in admins %}
+        <tr>
+          <td class="primary">{{ admin.first_name }} {{ admin.last_name }}</td>
+          <td>{{ admin.username }}</td>
+          <td>{{ admin.email }}</td>
+          <td>{{ admin.date_joined|date:"M d, Y" }}</td>
+          <td>
+            {% if admin.is_active %}<span class="badge badge-online">Active</span>
+            {% else %}<span class="badge badge-offline">Disabled</span>{% endif %}
+          </td>
+          <td>
+            <div class="actions-col">
+              <button type="button" class="btn perm-toggle-btn" onclick="togglePermRow({{ admin.id }}, this)">Manage permissions</button>
+              <form method="post" action="{% url 'toggle_admin_status' admin.id %}">
+                {% csrf_token %}
+                {% if admin.is_active %}
+                  <button type="submit" class="btn btn-danger">Disable access</button>
+                {% else %}
+                  <button type="submit" class="btn btn-accent">Enable access</button>
+                {% endif %}
+              </form>
+            </div>
+          </td>
+        </tr>
+        <tr class="perm-row" id="perm-row-{{ admin.id }}" style="display:none;">
+          <td colspan="6">
+            <form method="post" action="{% url 'update_admin_permissions' admin.id %}">
+              {% csrf_token %}
+              <div class="perm-panel">
+                <div class="perm-checks">
+                  <label><input type="checkbox" name="can_manage_alerts" {% if admin.can_manage_alerts %}checked{% endif %}> Resolve alerts</label>
+                  <label><input type="checkbox" name="can_manage_devices" {% if admin.can_manage_devices %}checked{% endif %}> View/manage devices</label>
+                  <label><input type="checkbox" name="can_add_admins" {% if admin.can_add_admins %}checked{% endif %}> Add administrators</label>
+                  <label><input type="checkbox" name="can_manage_settings" {% if admin.can_manage_settings %}checked{% endif %}> Manage settings</label>
+                </div>
+                <button type="submit" class="btn btn-accent">Save permissions</button>
+              </div>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr class="empty-row"><td colspan="6">No administrators registered yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  function togglePermRow(adminId, btn){
+    var row = document.getElementById('perm-row-' + adminId);
+    var isHidden = row.style.display === 'none' || !row.style.display;
+    row.style.display = isHidden ? 'table-row' : 'none';
+    row.classList.toggle('open', isHidden);
+    btn.textContent = isHidden ? 'Hide permissions' : 'Manage permissions';
+  }
+</script>
+
+{% endblock %}

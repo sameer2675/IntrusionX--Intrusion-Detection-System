@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}IntrusionX{% endblock %}</title>
+<style>
+  :root{
+    --bg: #0B0F14;
+    --panel: #0E141B;
+    --surface: #141B23;
+    --surface-raised: #182029;
+    --border: #212B35;
+    --border-soft: #1A2129;
+    --text: #E7EDF3;
+    --text-dim: #8A96A3;
+    --text-faint: #52606C;
+    --accent: #2DD4BF;
+    --accent-dim: #1B7A70;
+    --flag: #F2A93B;
+    --danger: #EF5A5A;
+    --success: #4ADE80;
+    --font-mono: "IBM Plex Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --font-sans: "IBM Plex Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  *{ box-sizing: border-box; }
+
+  html, body{
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+  }
+
+  a{ color: inherit; text-decoration: none; }
+
+  .app-shell{ display: flex; min-height: 100vh; }
+
+  /* ---------- Sidebar ---------- */
+
+  .sidebar{
+    width: 232px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--border-soft);
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    padding: 20px 14px;
+  }
+
+  .brand-mark{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 8px 22px;
+  }
+
+  .brand-glyph{
+    width: 26px; height: 26px;
+    border: 1px solid var(--accent-dim);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .brand-glyph::before{
+    content: "";
+    width: 8px; height: 8px;
+    background: var(--accent);
+    border-radius: 2px;
+    box-shadow: 0 0 10px rgba(45,212,191,0.65);
+  }
+
+  .brand-name{
+    font-family: var(--font-mono);
+    font-size: 14px;
+    letter-spacing: 0.03em;
+  }
+
+  .brand-name b{ color: var(--accent); font-weight: 600; }
+
+  .side-nav{
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .side-nav .nav-label{
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    padding: 14px 10px 6px;
+  }
+
+  .side-link{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 7px;
+    font-size: 13.5px;
+    color: var(--text-dim);
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+
+  .side-link svg{ width: 16px; height: 16px; flex-shrink: 0; opacity: 0.85; }
+
+  .side-link:hover{ background: var(--surface); color: var(--text); }
+
+  .side-link.active{
+    background: rgba(45,212,191,0.08);
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .side-link.active svg{ opacity: 1; }
+
+  .side-link.disabled{
+    color: var(--text-faint);
+    cursor: not-allowed;
+  }
+  .side-link.disabled svg{ opacity: 0.4; }
+  .side-link.disabled:hover{ background: none; color: var(--text-faint); }
+
+  .owner-only-toast{
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(12px);
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 13px;
+    padding: 11px 18px;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 100;
+  }
+  .owner-only-toast.show{
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .sidebar-foot{
+    margin-top: auto;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .company-chip{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    color: var(--text-dim);
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    margin-bottom: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .logout-link{
+    display: block;
+    font-size: 13px;
+    color: var(--text-dim);
+    padding: 8px 10px;
+    border-radius: 7px;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+
+  .logout-link:hover{ color: var(--danger); background: rgba(239,90,90,0.06); }
+  .main-col{ flex: 1; min-width: 0; }
+  .topbar{
+    height: 56px;
+    border-bottom: 1px solid var(--border-soft);
+    background: var(--panel);
+    display: flex;
+    align-items: center;
+    padding: 0 28px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .topbar .topbar-title{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+
+  .session-chip{
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-dim);
+    padding: 6px 12px;
+    border: 1px solid var(--border-soft);
+    border-radius: 100px;
+    background: var(--surface);
+  }
+
+  .session-chip .session-dot{
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    flex-shrink: 0;
+    box-shadow: 0 0 6px rgba(74,222,128,0.7);
+  }
+
+  .session-chip .session-role{
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 5px;
+    color: var(--accent);
+    background: rgba(45,212,191,0.10);
+  }
+
+  .session-chip .session-role.owner{
+    color: var(--flag);
+    background: rgba(242,169,59,0.10);
+  }
+
+  .session-chip strong{ color: var(--text); font-weight: 600; }
+
+  .page{
+    max-width: 1320px;
+    padding: 32px 28px 60px;
+  }
+  .page-head{ margin-bottom: 26px; }
+  .page-head .eyebrow{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 6px;
+  }
+  .page-head h1{
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+
+  .card{
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+  }
+  .card-head{
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border-soft);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .card-head h3{
+    font-size: 13.5px;
+    font-weight: 600;
+    margin: 0;
+    color: var(--text);
+  }
+  .card-head .card-sub{
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--text-faint);
+    letter-spacing: 0.04em;
+  }
+
+  .card-body{ padding: 18px; }
+  .badge{
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 3px 9px;
+    border-radius: 100px;
+  }
+
+  .badge::before{
+    content: "";
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .badge-low{ color: var(--accent); background: rgba(45,212,191,0.10); }
+  .badge-medium{ color: var(--flag); background: rgba(242,169,59,0.10); }
+  .badge-high{ color: var(--danger); background: rgba(239,90,90,0.10); }
+  .badge-online{ color: var(--success); background: rgba(74,222,128,0.10); }
+  .badge-offline{ color: var(--text-faint); background: rgba(82,96,108,0.14); }
+  .badge-resolved{ color: var(--text-faint); background: rgba(82,96,108,0.14); }
+  .badge-pending{ color: var(--flag); background: rgba(242,169,59,0.10); }
+
+
+  .btn{
+    font-family: var(--font-sans);
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 7px 13px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface-raised);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .btn:hover{ border-color: var(--accent-dim); color: var(--text); }
+  .btn-accent{
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #06231F;
+  }
+  .btn-accent:hover{ filter: brightness(1.08); border-color: var(--accent); color: #06231F; }
+  .btn-danger:hover{ border-color: var(--danger); color: var(--danger); }
+  .select-filter{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 12.5px;
+    padding: 7px 10px;
+    border-radius: 6px;
+  }
+  .pagination{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 16px 18px;
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .pagination .page-link{
+    font-family: var(--font-sans);
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--accent);
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+  .pagination .page-link:hover{ border-color: var(--accent-dim); background: var(--surface-raised); }
+  .pagination .page-link.disabled{
+    color: var(--text-faint);
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  .pagination .page-status{
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--text-faint);
+  }
+  @media (max-width: 980px){
+    .app-shell{ flex-direction: column; }
+    .sidebar{ width: 100%; height: auto; position: relative; flex-direction: row; overflow-x: auto; padding: 12px; }
+    .side-nav{ flex-direction: row; }
+    .sidebar-foot{ display: none; }
+  }
+</style>
+{% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand-mark">
+      <span class="brand-glyph"></span>
+      <span class="brand-name"><b>Intrusion</b>X</span>
+    </div>
+
+    <nav class="side-nav">
+      <a class="side-link {% if active_page == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Dashboard
+      </a>
+      <a class="side-link {% if active_page == 'alerts' %}active{% endif %}" href="{% url 'alerts_page' %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v9M12 17h.01"/><path d="M10.6 4.3 2.9 18a1.7 1.7 0 0 0 1.5 2.5h15.2a1.7 1.7 0 0 0 1.5-2.5L13.4 4.3a1.7 1.7 0 0 0-2.8 0Z"/></svg>
+        Alerts
+      </a>
+      <a class="side-link {% if active_page == 'devices' %}active{% endif %}" href="{% url 'devices_page' %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg>
+        Devices
+      </a>
+      <a class="side-link {% if active_page == 'analytics' %}active{% endif %}" href="{% url 'analytics_page' %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>
+        Analytics
+      </a>
+
+      <div class="nav-label">Administration</div>
+
+      {% if is_owner %}
+      <a class="side-link {% if active_page == 'permissions' %}active{% endif %}" href="{% url 'permission_manager' %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 4.5 6v6c0 4.5 3.1 7.7 7.5 9 4.4-1.3 7.5-4.5 7.5-9V6L12 3Z"/></svg>
+        Permission Manager
+      </a>
+      {% else %}
+      <a class="side-link disabled" href="#" onclick="return showOwnerOnlyNotice(event)" aria-disabled="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 4.5 6v6c0 4.5 3.1 7.7 7.5 9 4.4-1.3 7.5-4.5 7.5-9V6L12 3Z"/></svg>
+        Permission Manager
+      </a>
+      {% endif %}
+
+      {% if can_add_admins %}
+      <a class="side-link" href="{% url 'register' %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
+        Add Administrator
+      </a>
+      {% else %}
+      <a class="side-link disabled" href="#" onclick="return showOwnerOnlyNotice(event)" aria-disabled="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
+        Add Administrator
+      </a>
+      {% endif %}
+
+      {% if can_manage_settings %}
+      <a class="side-link {% if active_page == 'settings' %}active{% endif %}" href="{% url 'company_settings' %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9c.2.6.7 1 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+        Settings
+      </a>
+      {% else %}
+      <a class="side-link disabled" href="#" onclick="return showOwnerOnlyNotice(event)" aria-disabled="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9c.2.6.7 1 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+        Settings
+      </a>
+      {% endif %}
+    </nav>
+
+    <div class="sidebar-foot">
+      {% if company %}<div class="company-chip">{{ company.name }}</div>{% endif %}
+      <a class="logout-link" href="{% url 'logout_view' %}">Sign out</a>
+    </div>
+  </aside>
+
+  <div class="main-col">
+    <header class="topbar">
+      <span class="topbar-title">{% block topbar_title %}Overview{% endblock %}</span>
+      <div class="session-chip">
+        <span class="session-dot"></span>
+        <span>Signed in as
+          <strong>{% if is_owner %}{{ company.name }}{% else %}{{ request.user.get_full_name|default:request.user.username }}{% endif %}</strong>
+        </span>
+        <span class="session-role {% if is_owner %}owner{% endif %}">{% if is_owner %}Company Administrator{% else %}Admin{% endif %}</span>
+      </div>
+    </header>
+
+    <div class="page">
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+</div>
+
+<div id="owner-only-toast" class="owner-only-toast" role="status" aria-live="polite">
+  Only the company owner can access this.
+</div>
+
+<script>
+  function showOwnerOnlyNotice(e){
+    e.preventDefault();
+    var toast = document.getElementById('owner-only-toast');
+    toast.classList.remove('show');
+    void toast.offsetWidth;
+    toast.classList.add('show');
+    clearTimeout(window._ownerToastTimer);
+    window._ownerToastTimer = setTimeout(function(){
+      toast.classList.remove('show');
+    }, 2600);
+    return false;
+  }
+</script>
+
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>
