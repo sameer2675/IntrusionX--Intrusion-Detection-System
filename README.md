@@ -4,7 +4,7 @@
 
 IntrusionX is the server-side command center for a distributed intrusion-detection system. Companies register, provision secure enrollment keys, and watch their entire device fleet — CPU/RAM/disk telemetry, live security status, and machine-learning-flagged network attacks — stream into a single real-time dashboard. Every agent authenticates with a hashed per-device token, every alert is deduplicated before it reaches an analyst, and every company's data is strictly isolated behind company-scoped WebSocket channel groups.
 
-This is the companion server to **[IntrusionXAgent](../IntrusionXAgent)** — the lightweight Windows agent that captures live traffic, classifies flows with a trained decision-tree model, and reports back here.
+This is the companion server to **[IntrusionXAgent](https://github.com/sameer2675/IntrusionX-Agent--Intrusion-Detection-Agent)** — the lightweight Windows agent that captures live traffic, classifies flows with a trained decision-tree model, and reports back here.
 
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
 ![Django](https://img.shields.io/badge/Django-6.0-092E20?logo=django&logoColor=white)
@@ -332,7 +332,7 @@ The in-memory channel layer is ideal for local development and single-process de
 ## Usage
 
 1. **Register a company** — create an account and receive a hashed, one-time registration key.
-2. **Enroll devices** — install and run [IntrusionXAgent](../IntrusionXAgent) on each endpoint, supplying the registration key once.
+2. **Enroll devices** — install and run [IntrusionXAgent](https://github.com/sameer2675/IntrusionX-Agent--Intrusion-Detection-Agent) on each endpoint, supplying the registration key once.
 3. **Watch the fleet live** — enrolled devices appear on the dashboard with real-time CPU/RAM/disk metrics and security status.
 4. **Respond to alerts** — when an agent's ML model flags malicious traffic, the alert appears instantly; triage it individually, per-device, or in bulk.
 5. **Manage access** — invite additional company admins and scope their permissions across alerts, devices, admins, and settings.
@@ -366,7 +366,7 @@ The in-memory channel layer is ideal for local development and single-process de
 
 ## Related Project
 
-**[IntrusionXAgent](../IntrusionXAgent)** — the Windows endpoint agent that captures live network traffic, extracts flow features, classifies them with a trained decision-tree model, and reports device health and detected attacks to this server.
+**[IntrusionXAgent](https://github.com/sameer2675/IntrusionX-Agent--Intrusion-Detection-Agent)** — the Windows endpoint agent that captures live network traffic, extracts flow features, classifies them with a trained decision-tree model, and reports device health and detected attacks to this server.
 
 ---
 
@@ -388,7 +388,7 @@ The in-memory channel layer is ideal for local development and single-process de
 
 ## Future Enhancements
 
-IntrusionX's architecture was built with room to grow:
+IntrusionX architecture was built with room to grow:
 
 - **Multi-worker scalability** — swapping the in-memory channel layer for `channels_redis` is a drop-in configuration change that unlocks horizontal scaling of the real-time layer.
 - **SIEM integration** — the alert schema (attack type, confidence, IPs, protocol, full feature vector) is already structured for export to external security tooling.
