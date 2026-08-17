@@ -17,19 +17,19 @@ This is the companion server to **[IntrusionXAgent](../IntrusionXAgent)** — th
 
 <table>
 <tr>
-<td width="33%"><img src="IntrusionX_demo/1.png" alt="IntrusionX screenshot 1"></td>
-<td width="33%"><img src="IntrusionX_demo/2.png" alt="IntrusionX screenshot 2"></td>
-<td width="33%"><img src="IntrusionX_demo/3.png" alt="IntrusionX screenshot 3"></td>
+<td width="33%"><img src="IntraX/IntrusionX_demo/1.png" alt="IntrusionX screenshot 1"></td>
+<td width="33%"><img src="IntraX/IntrusionX_demo/2.png" alt="IntrusionX screenshot 2"></td>
+<td width="33%"><img src="IntraX/IntrusionX_demo/3.png" alt="IntrusionX screenshot 3"></td>
 </tr>
 <tr>
-<td width="33%"><img src="IntrusionX_demo/4.png" alt="IntrusionX screenshot 4"></td>
-<td width="33%"><img src="IntrusionX_demo/5.png" alt="IntrusionX screenshot 5"></td>
-<td width="33%"><img src="IntrusionX_demo/6.png" alt="IntrusionX screenshot 6"></td>
+<td width="33%"><img src="IntraX/IntrusionX_demo/4.png" alt="IntrusionX screenshot 4"></td>
+<td width="33%"><img src="IntraX/IntrusionX_demo/5.png" alt="IntrusionX screenshot 5"></td>
+<td width="33%"><img src="IntraX/IntrusionX_demo/6.png" alt="IntrusionX screenshot 6"></td>
 </tr>
 </table>
 
 
-### [![Watch the IntrusionX Demo](IntrusionX_demo/intrusionx_thumbnail.png)](https://youtu.be/q2XAMKQtJeU)
+### [![Watch the IntrusionX Demo](IntraX/IntrusionX_demo/intrusionx_thumbnail.png)](https://youtu.be/q2XAMKQtJeU)
 ---
 
 ## Overview
