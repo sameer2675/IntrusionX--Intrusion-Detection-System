@@ -304,6 +304,15 @@
     border-radius: 50%;
     background: currentColor;
   }
+  .alert-note{
+    margin-top: 4px;
+    max-width: 380px;
+    font-size: 11.5px;
+    font-weight: 400;
+    line-height: 1.45;
+    white-space: normal;
+    color: var(--text-faint);
+  }
   .badge-low{ color: var(--accent); background: rgba(45,212,191,0.10); }
   .badge-medium{ color: var(--flag); background: rgba(242,169,59,0.10); }
   .badge-high{ color: var(--danger); background: rgba(239,90,90,0.10); }
@@ -311,6 +320,27 @@
   .badge-offline{ color: var(--text-faint); background: rgba(82,96,108,0.14); }
   .badge-resolved{ color: var(--text-faint); background: rgba(82,96,108,0.14); }
   .badge-pending{ color: var(--flag); background: rgba(242,169,59,0.10); }
+  .badge-blocked{ color: var(--accent); background: rgba(45,212,191,0.10); }
+  .badge-unblocking{ color: var(--flag); background: rgba(242,169,59,0.10); }
+  .badge-failed{ color: var(--danger); background: rgba(239,90,90,0.10); }
+  .badge-expired{ color: var(--text-faint); background: rgba(82,96,108,0.14); }
+  .block-cell{ white-space: nowrap; }
+  .block-cell .badge{ vertical-align: middle; }
+  .block-form{ display: inline-flex; align-items: center; gap: 6px; }
+  .block-form .select-filter{ padding: 5px 8px; font-size: 12px; }
+  .inline-form{ display: inline-block; margin: 0 0 0 8px; vertical-align: middle; }
+  .flash-list{ list-style: none; margin: 0 0 18px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .flash-list li{
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-dim);
+  }
+  .flash-list li.success{ border-color: var(--accent-dim); color: var(--accent); }
+  .flash-list li.warning{ border-color: var(--flag); color: var(--flag); }
+  .flash-list li.error{ border-color: var(--danger); color: var(--danger); }
 
 
   .btn{
@@ -398,6 +428,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v9M12 17h.01"/><path d="M10.6 4.3 2.9 18a1.7 1.7 0 0 0 1.5 2.5h15.2a1.7 1.7 0 0 0 1.5-2.5L13.4 4.3a1.7 1.7 0 0 0-2.8 0Z"/></svg>
         Alerts
       </a>
+      <a class="side-link {% if active_page == 'blocks' %}active{% endif %}" href="{% url 'blocks_page' %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>
+        Blocks
+      </a>
       <a class="side-link {% if active_page == 'devices' %}active{% endif %}" href="{% url 'devices_page' %}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg>
         Devices
@@ -465,6 +499,11 @@
     </header>
 
     <div class="page">
+      {% if messages %}
+      <ul class="flash-list">
+        {% for message in messages %}<li class="{{ message.tags }}">{{ message }}</li>{% endfor %}
+      </ul>
+      {% endif %}
       {% block content %}{% endblock %}
     </div>
   </div>

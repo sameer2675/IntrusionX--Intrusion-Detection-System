@@ -1,5 +1,6 @@
 from datetime import timedelta, datetime
 from functools import wraps
+import json
 import secrets
 from django.contrib import messages
 from django.shortcuts import render, redirect
@@ -11,8 +12,11 @@ from django.utils import timezone
 from django.db.models import Count, Avg, Q, Max
 from django.db.models.functions import TruncHour, TruncDate, ExtractHour
 from django.core.paginator import Paginator
+from django.core.exceptions import ValidationError
+from django.utils.http import url_has_allowed_host_and_scheme
 
-from .models import Company, User, Device, Alert
+from .models import Company, User, Device, Alert, BlockAction
+from EntronApi.views import _broadcast_block, _to_int
 
 def test(request):
     return HttpResponse("Hello !")
@@ -162,6 +166,38 @@ def logout_view(request):
     return redirect('admin_login')
 
 
+DEVICE_OFFLINE_AFTER_SECONDS = 40
+ACTIVE_BLOCK_STATUSES = ("Pending", "Blocked")
+BLOCK_DURATION_CHOICES = [(15, "15 min"), (60, "1 hour"), (240, "4 hours"), (1440, "24 hours")]
+BLOCK_DURATION_JSON = json.dumps(BLOCK_DURATION_CHOICES)
+
+
+def attach_blocks(device, alert_list):
+    ips = {alert.source_ip for alert in alert_list}
+    latest = {}
+    if ips:
+        for block in BlockAction.objects.filter(device=device, ip_address__in=ips).order_by('-created_at'):
+            latest.setdefault(block.ip_address, block)
+    for alert in alert_list:
+        block = latest.get(alert.source_ip)
+        alert.block = block
+        alert.block_active = bool(block and block.status in ACTIVE_BLOCK_STATUSES and not block.unblock_requested)
+        alert.block_unblocking = bool(block and block.status == "Blocked" and block.unblock_requested)
+    return alert_list
+
+
+def redirect_back(request, fallback):
+    target = request.META.get('HTTP_REFERER')
+    if target and url_has_allowed_host_and_scheme(target, allowed_hosts={request.get_host()}):
+        return redirect(target)
+    return redirect(fallback)
+
+
+def refresh_device_status(company):
+    cutoff = timezone.now() - timedelta(seconds=DEVICE_OFFLINE_AFTER_SECONDS)
+    Device.objects.filter(company=company, status=True, last_seen__lt=cutoff).update(status=False)
+
+
 def get_current_company(request):
     if request.user.is_authenticated and getattr(request.user, "company_id", None):
         return request.user.company
@@ -174,6 +210,7 @@ def get_current_company(request):
 @company_login_required
 def dashboard(request):
     company = get_current_company(request)
+    refresh_device_status(company)
     devices = Device.objects.filter(company=company)
     alerts = Alert.objects.filter(company=company)
     now = timezone.now()
@@ -336,6 +373,7 @@ def device_alerts_page(request, device_id):
     pending_count = Alert.objects.filter(company=company, device=device, status="Pending").count()
     paginator = Paginator(alerts, 25)
     alerts_page = paginator.get_page(request.GET.get('page'))
+    attach_blocks(device, list(alerts_page))
     querystring = request.GET.copy()
     querystring.pop('page', None)
     context = {
@@ -345,6 +383,8 @@ def device_alerts_page(request, device_id):
         "can_add_admins": has_permission(request, 'can_add_admins'),
         "can_manage_settings": has_permission(request, 'can_manage_settings'),
         "can_manage_alerts": has_permission(request, 'can_manage_alerts'),
+        "block_durations": BLOCK_DURATION_CHOICES,
+        "block_durations_json": BLOCK_DURATION_JSON,
         "device": device,
         "alerts": alerts_page,
         "pending_count": pending_count,
@@ -415,6 +455,7 @@ def resolve_alert(request, alert_id):
 @company_login_required
 def devices_page(request):
     company = _resolve_company_or_fallback(request)
+    refresh_device_status(company)
     devices = Device.objects.filter(company=company).order_by('-last_seen')
     paginator = Paginator(devices, 20)
     devices_page_obj = paginator.get_page(request.GET.get('page'))
@@ -431,6 +472,7 @@ def devices_page(request):
 @company_login_required
 def device_detail(request, device_id):
     company = _resolve_company_or_fallback(request)
+    refresh_device_status(company)
     device = Device.objects.filter(device_id=device_id, company=company).first()
     if device is None:
         messages.error(request, "Device not found.")
@@ -444,8 +486,11 @@ def device_detail(request, device_id):
         "can_add_admins": has_permission(request, 'can_add_admins'),
         "can_manage_settings": has_permission(request, 'can_manage_settings'),
         "can_manage_alerts": has_permission(request, 'can_manage_alerts'),
+        "block_durations": BLOCK_DURATION_CHOICES,
+        "block_durations_json": BLOCK_DURATION_JSON,
+        "recent_blocks": BlockAction.objects.filter(device=device)[:10],
         "device": device,
-        "alerts": alerts[:100],
+        "alerts": attach_blocks(device, list(alerts[:100])),
         "pending_count": pending_qs.count(),
         "total_alert_count": alerts.count(),
         "is_secure": not pending_qs.exists(),
@@ -653,3 +698,128 @@ def change_company_password(request):
     company.save()
     messages.success(request, "Company login password updated.")
     return redirect('company_settings')
+
+
+@permission_required('can_manage_alerts')
+def block_alert(request, alert_id):
+    if request.method != "POST":
+        return HttpResponse(status=405)
+    company = _resolve_company_or_fallback(request)
+    alert = Alert.objects.filter(id=alert_id, company=company).select_related('device').first()
+    if alert is None or alert.device is None:
+        messages.error(request, "This alert is not linked to a device, so it cannot be blocked.")
+        return redirect_back(request, 'alerts_page')
+    device = alert.device
+    if alert.source_ip == device.ip_address:
+        messages.error(request, "The source address is this device itself, so it was not blocked.")
+        return redirect_back(request, 'alerts_page')
+    duration_minutes = _to_int(request.POST.get('duration'))
+    if duration_minutes not in {minutes for minutes, _ in BLOCK_DURATION_CHOICES}:
+        duration_minutes = BLOCK_DURATION_CHOICES[0][0]
+    port = None
+    protocol = None
+    if request.POST.get('mode') == "port":
+        port = _to_int((alert.flow_features or {}).get("Destination Port"))
+        protocol = _to_int(alert.protocol)
+        if port is None:
+            messages.error(request, "This alert has no destination port, so only the whole IP can be blocked.")
+            return redirect_back(request, 'alerts_page')
+    active = BlockAction.objects.filter(device=device, ip_address=alert.source_ip, status__in=ACTIVE_BLOCK_STATUSES)
+    if port is None:
+        existing = active.filter(port__isnull=True).first()
+    else:
+        existing = active.filter(Q(port__isnull=True) | Q(port=port)).first()
+    if existing is not None:
+        messages.info(request, f"{alert.source_ip} is already blocked or has a block pending on {device.name}.")
+        return redirect_back(request, 'alerts_page')
+    repeat_count = BlockAction.objects.filter(device=device, ip_address=alert.source_ip).count() + 1
+    action = BlockAction.objects.create(
+        company=company,
+        device=device,
+        alert=alert,
+        requested_by=request.user if request.user.is_authenticated else None,
+        ip_address=alert.source_ip,
+        port=port,
+        protocol=protocol,
+        attack_type=alert.attack_type,
+        confidence=alert.confidence,
+        reason=f"Analyst block: {alert.attack_type}",
+        status="Pending",
+        source="Analyst",
+        duration_seconds=duration_minutes * 60,
+        repeat_count=repeat_count)
+    _broadcast_block(action)
+    target = f"{alert.source_ip}:{port}" if port else alert.source_ip
+    if device.status:
+        messages.success(request, f"Block for {target} sent to {device.name}. It applies on the next heartbeat.")
+    else:
+        messages.warning(request, f"{device.name} is offline. The block for {target} is queued and expires if the device does not reconnect within 10 minutes.")
+    return redirect_back(request, 'alerts_page')
+
+
+@permission_required('can_manage_alerts')
+def unblock_action(request, action_id):
+    if request.method != "POST":
+        return HttpResponse(status=405)
+    company = _resolve_company_or_fallback(request)
+    action = BlockAction.objects.filter(id=action_id, company=company).select_related('device').first()
+    if action is None:
+        messages.error(request, "Block not found.")
+        return redirect_back(request, 'blocks_page')
+    if action.status == "Pending":
+        action.status = "Unblocked"
+        action.message = "Cancelled before it reached the device."
+        action.save()
+        _broadcast_block(action)
+        messages.success(request, f"Pending block for {action.target} cancelled.")
+    elif action.status == "Blocked":
+        action.unblock_requested = True
+        action.message = "Unblock requested by analyst."
+        action.save()
+        _broadcast_block(action)
+        messages.success(request, f"Unblock for {action.target} sent to {action.device.name}. It applies on the next heartbeat.")
+    else:
+        messages.info(request, f"{action.target} is not currently blocked.")
+    return redirect_back(request, 'blocks_page')
+
+
+@company_login_required
+def blocks_page(request):
+    company = _resolve_company_or_fallback(request)
+    refresh_device_status(company)
+    all_blocks = BlockAction.objects.filter(company=company)
+    blocks = all_blocks.select_related('device')
+    status_filter = request.GET.get('status') or ""
+    device_filter = request.GET.get('device') or ""
+    if status_filter in {"Pending", "Blocked", "Failed", "Expired", "Unblocked"}:
+        blocks = blocks.filter(status=status_filter)
+    else:
+        status_filter = ""
+    if device_filter:
+        try:
+            blocks = blocks.filter(device_id=device_filter)
+        except (ValidationError, ValueError):
+            device_filter = ""
+    last_24h = timezone.now() - timedelta(hours=24)
+    paginator = Paginator(blocks, 25)
+    blocks_page_obj = paginator.get_page(request.GET.get('page'))
+    querystring = request.GET.copy()
+    querystring.pop('page', None)
+    context = {
+        "company": company,
+        "active_page": "blocks",
+        "is_owner": is_company_owner(request),
+        "can_add_admins": has_permission(request, 'can_add_admins'),
+        "can_manage_settings": has_permission(request, 'can_manage_settings'),
+        "can_manage_alerts": has_permission(request, 'can_manage_alerts'),
+        "blocks": blocks_page_obj,
+        "all_devices": Device.objects.filter(company=company).order_by('name'),
+        "status_filter": status_filter,
+        "device_filter": device_filter,
+        "querystring": querystring.urlencode(),
+        "active_count": all_blocks.filter(status="Blocked").count(),
+        "pending_count": all_blocks.filter(status="Pending").count(),
+        "failed_count": all_blocks.filter(status="Failed", created_at__gte=last_24h).count(),
+        "filtered": bool(status_filter or device_filter),
+    }
+    return render(request, 'Entron/blocks.html', context)

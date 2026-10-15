@@ -1,0 +1,12 @@
+{% if a.block %}{% include "Entron/_block_badge.html" with b=a.block %}{% endif %}
+{% if can_manage_alerts %}
+{% if a.block_active %}
+<form method="post" action="{% url 'unblock_action' a.block.id %}" class="inline-form">{% csrf_token %}<button type="submit" class="btn btn-danger">Unblock</button></form>
+{% elif not a.block_unblocking %}
+<form method="post" action="{% url 'block_alert' a.id %}" class="block-form">{% csrf_token %}
+  <select name="mode" class="select-filter"><option value="ip">Whole IP</option><option value="port">IP + port</option></select>
+  <select name="duration" class="select-filter">{% for minutes, label in block_durations %}<option value="{{ minutes }}">{{ label }}</option>{% endfor %}</select>
+  <button type="submit" class="btn btn-accent">Block</button>
+</form>
+{% endif %}
+{% endif %}

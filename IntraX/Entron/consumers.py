@@ -43,6 +43,12 @@ class DashboardConsumer(AsyncWebsocketConsumer):
             "alert": event["alert"],
         }))
 
+    async def block_update(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "block.update",
+            "block": event["block"],
+        }))
+
     async def device_status(self, event):
         await self.send(text_data=json.dumps({
             "type": "device.status",

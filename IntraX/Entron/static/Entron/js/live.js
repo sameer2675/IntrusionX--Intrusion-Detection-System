@@ -33,6 +33,8 @@
 
       if (data.type === "alert.new") {
         document.dispatchEvent(new CustomEvent("entronx:alert", { detail: data.alert }));
+      } else if (data.type === "block.update") {
+        document.dispatchEvent(new CustomEvent("entronx:block", { detail: data.block }));
       } else if (data.type === "device.status") {
         document.dispatchEvent(new CustomEvent("entronx:device", { detail: data.device }));
       }

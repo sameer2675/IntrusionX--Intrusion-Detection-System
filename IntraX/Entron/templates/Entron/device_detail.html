@@ -110,7 +110,7 @@
 </div>
 
 {% url 'resolve_alert' 999999 as resolve_url_template %}
-<div id="alerts-section" data-can-manage-alerts="{{ can_manage_alerts|yesno:'true,false' }}" data-resolve-url-template="{{ resolve_url_template }}">
+<div id="alerts-section" data-can-manage-alerts="{{ can_manage_alerts|yesno:'true,false' }}" data-resolve-url-template="{{ resolve_url_template }}" data-block-url-template="{% url 'block_alert' 999999 %}" data-unblock-url-template="{% url 'unblock_action' 999999 %}" data-durations="{{ block_durations_json }}">
 {% if is_secure %}
 <div class="card all-secure">
   <span class="secure-badge">
@@ -128,13 +128,13 @@
   <div class="card-body" style="padding: 8px 0 4px;">
     <table class="data-table">
       <thead>
-        <tr><th>Time</th><th>Attack</th><th>Severity</th><th>Source IP</th><th>Confidence</th><th>Status</th><th></th></tr>
+        <tr><th>Time</th><th>Attack</th><th>Severity</th><th>Source IP</th><th>Confidence</th><th>Status</th><th></th><th>Response</th></tr>
       </thead>
       <tbody>
         {% for a in alerts %}
         <tr>
           <td>{{ a.created_at|date:"M d, H:i" }}</td>
-          <td class="primary">{{ a.attack_type }}</td>
+          <td class="primary">{{ a.attack_type }}{% if a.attack_type == "Volumetric flood" %}<div class="alert-note">{{ a.description }}</div>{% endif %}</td>
           <td>
             {% if a.severity == "High" %}<span class="badge badge-high">High</span>
             {% elif a.severity == "Medium" %}<span class="badge badge-medium">Medium</span>
@@ -154,6 +154,7 @@
             </form>
             {% endif %}
           </td>
+          <td class="block-cell" data-device-id="{{ device.device_id }}" data-ip="{{ a.source_ip }}" data-alert-id="{{ a.id }}">{% include "Entron/_block_cell.html" %}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -163,10 +164,40 @@
 {% endif %}
 </div>
 
+<div class="card" style="margin-top: 22px;">
+  <div class="card-head">
+    <h3>Recent blocks</h3>
+    <span class="card-sub"><a href="{% url 'blocks_page' %}?device={{ device.device_id }}" style="color: var(--accent);">VIEW ALL</a></span>
+  </div>
+  <div class="card-body" style="padding: 8px 0 4px;">
+    <table class="data-table">
+      <thead>
+        <tr><th>Time</th><th>IP</th><th>Port</th><th>Attack</th><th>Source</th><th>Status</th><th>Expires</th></tr>
+      </thead>
+      <tbody>
+        {% for b in recent_blocks %}
+        <tr>
+          <td>{{ b.created_at|date:"M d, H:i" }}</td>
+          <td class="primary">{{ b.target }}</td>
+          <td>{{ b.port|default:"All" }}</td>
+          <td>{{ b.attack_type|default:"-" }}</td>
+          <td>{{ b.source }}</td>
+          <td>{% include "Entron/_block_badge.html" %}</td>
+          <td>{{ b.expires_at|date:"M d, H:i"|default:"-" }}</td>
+        </tr>
+        {% empty %}
+        <tr class="empty-row"><td colspan="7" style="text-align:center; color: var(--text-faint); padding: 26px 12px;">No blocks for this device yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_scripts %}
 <script src="{% static 'Entron/js/live.js' %}"></script>
+<script src="{% static 'Entron/js/blocks.js' %}"></script>
 <script>
   const PAGE_DEVICE_ID = document.querySelector('.info-grid')?.dataset.deviceId;
 
@@ -217,7 +248,7 @@
     const rowHtml = `
       <tr>
         <td>${time}</td>
-        <td class="primary">${a.attack_type}</td>
+        <td class="primary">${a.attack_type}${a.attack_type === 'Volumetric flood' && a.description ? '<div class="alert-note">' + IntrusionXBlocks.escapeHtml(a.description) + '</div>' : ''}</td>
         <td>${severityBadge(a.severity)}</td>
         <td>${a.source_ip}</td>
         <td>${a.confidence.toFixed(1)}%</td>
@@ -227,6 +258,7 @@
             <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken()}">
             <button type="submit" class="btn">Resolve</button>
           </form>` : ''}</td>
+        ${IntrusionXBlocks.cellFor(IntrusionXBlocks.readConfig(section), a)}
       </tr>`;
 
     const secureCard = section.querySelector('.all-secure');
@@ -241,7 +273,7 @@
           <div class="card-body" style="padding: 8px 0 4px;">
             <table class="data-table">
               <thead>
-                <tr><th>Time</th><th>Attack</th><th>Severity</th><th>Source IP</th><th>Confidence</th><th>Status</th><th></th></tr>
+                <tr><th>Time</th><th>Attack</th><th>Severity</th><th>Source IP</th><th>Confidence</th><th>Status</th><th></th><th>Response</th></tr>
               </thead>
               <tbody>${rowHtml}</tbody>
             </table>

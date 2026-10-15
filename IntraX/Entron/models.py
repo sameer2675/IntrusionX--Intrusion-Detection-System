@@ -72,3 +72,54 @@ class Alert(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     def __str__(self):
         return self.attack_type
+
+
+class BlockAction(models.Model):
+    STATUS = [
+        ("Pending", "Pending"),
+        ("Blocked", "Blocked"),
+        ("Failed", "Failed"),
+        ("Expired", "Expired"),
+        ("Unblocked", "Unblocked"),
+    ]
+    SOURCE = [
+        ("Auto", "Auto"),
+        ("Analyst", "Analyst"),
+    ]
+
+    company = models.ForeignKey(Company, on_delete=models.CASCADE)
+    device = models.ForeignKey(Device, on_delete=models.CASCADE)
+    alert = models.ForeignKey(Alert, on_delete=models.SET_NULL, null=True, blank=True, related_name="block_actions")
+    requested_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    ip_address = models.GenericIPAddressField()
+    cidr = models.CharField(max_length=18, blank=True, default="")
+    port = models.PositiveIntegerField(null=True, blank=True)
+    protocol = models.PositiveSmallIntegerField(null=True, blank=True)
+    rule = models.CharField(max_length=100, blank=True, default="")
+    attack_type = models.CharField(max_length=100, blank=True, default="")
+    confidence = models.FloatField(default=0)
+    reason = models.TextField(blank=True, default="")
+    message = models.TextField(blank=True, default="")
+    status = models.CharField(max_length=20, choices=STATUS, default="Pending")
+    source = models.CharField(max_length=20, choices=SOURCE, default="Auto")
+    duration_seconds = models.PositiveIntegerField(default=900)
+    unblock_requested = models.BooleanField(default=False)
+    repeat_count = models.PositiveIntegerField(default=1)
+    blocked_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["device", "status"]),
+            models.Index(fields=["company", "ip_address"]),
+        ]
+
+    @property
+    def target(self):
+        return self.cidr or self.ip_address
+
+    def __str__(self):
+        return f"{self.target} ({self.status})"

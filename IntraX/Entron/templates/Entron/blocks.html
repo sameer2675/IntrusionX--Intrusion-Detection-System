@@ -1,0 +1,224 @@
+{% extends "Entron/base_app.html" %}
+{% load static %}
+
+{% block title %}Blocks · IntrusionX{% endblock %}
+{% block topbar_title %}Blocks{% endblock %}
+
+{% block extra_head %}
+<style>
+  .filter-bar{ display: flex; align-items: center; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+  .info-grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  .stat-card{
+    background: var(--surface);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .stat-card .stat-label{
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0 0 10px;
+  }
+  .stat-card .stat-value{
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  table.data-table{ width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.data-table th{
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    font-weight: 500;
+    padding: 0 14px 10px;
+  }
+  table.data-table td{
+    padding: 11px 14px;
+    border-top: 1px solid var(--border-soft);
+    color: var(--text-dim);
+  }
+  table.data-table td.primary{ color: var(--text); }
+  table.data-table tr:hover td{ background: var(--surface-raised); }
+  .empty-row td{ text-align: center; color: var(--text-faint); padding: 30px 12px; }
+  .range-tag{
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .msg-cell{ max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-head">
+  <p class="eyebrow">Active response</p>
+  <h1>Blocks</h1>
+</div>
+
+<div class="info-grid">
+  <div class="stat-card"><p class="stat-label">Active blocks</p><p class="stat-value">{{ active_count }}</p></div>
+  <div class="stat-card"><p class="stat-label">Pending</p><p class="stat-value">{{ pending_count }}</p></div>
+  <div class="stat-card"><p class="stat-label">Failed (24h)</p><p class="stat-value">{{ failed_count }}</p></div>
+</div>
+
+<form method="get" class="filter-bar">
+  <select name="status" class="select-filter" onchange="this.form.submit()">
+    <option value="" {% if not status_filter %}selected{% endif %}>All statuses</option>
+    <option value="Pending" {% if status_filter == "Pending" %}selected{% endif %}>Pending</option>
+    <option value="Blocked" {% if status_filter == "Blocked" %}selected{% endif %}>Blocked</option>
+    <option value="Failed" {% if status_filter == "Failed" %}selected{% endif %}>Failed</option>
+    <option value="Expired" {% if status_filter == "Expired" %}selected{% endif %}>Expired</option>
+    <option value="Unblocked" {% if status_filter == "Unblocked" %}selected{% endif %}>Unblocked</option>
+  </select>
+  <select name="device" class="select-filter" onchange="this.form.submit()">
+    <option value="" {% if not device_filter %}selected{% endif %}>All devices</option>
+    {% for d in all_devices %}
+    <option value="{{ d.device_id }}" {% if device_filter == d.device_id|stringformat:"s" %}selected{% endif %}>{{ d.name }}</option>
+    {% endfor %}
+  </select>
+</form>
+
+<div class="card">
+  <div class="card-head">
+    <h3>Block history</h3>
+    <span class="card-sub">
+      {% if blocks.paginator.count %}SHOWING {{ blocks.start_index }}–{{ blocks.end_index }} OF {{ blocks.paginator.count }}{% else %}NO BLOCKS{% endif %}
+    </span>
+  </div>
+  <div class="card-body" style="padding: 8px 0 4px;">
+    <table class="data-table" id="blocks-table"
+           data-can-manage-alerts="{{ can_manage_alerts|yesno:'true,false' }}"
+           data-unblock-url-template="{% url 'unblock_action' 999999 %}"
+           data-live-insert="{{ filtered|yesno:'false,true' }}"
+           data-page="{{ blocks.number }}">
+      <thead>
+        <tr><th>Time</th><th>Device</th><th>IP</th><th>Port</th><th>Attack</th><th>Source</th><th>Status</th><th>Expires</th><th>Repeat</th><th>Details</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for b in blocks %}
+        <tr data-block-id="{{ b.id }}">
+          <td>{{ b.created_at|date:"M d, H:i" }}</td>
+          <td>{{ b.device.name }}</td>
+          <td class="primary">{% if b.cidr %}{{ b.cidr }}<span class="range-tag">Range</span>{% else %}{{ b.ip_address }}{% endif %}</td>
+          <td>{{ b.port|default:"All" }}</td>
+          <td>{{ b.attack_type|default:"-" }}</td>
+          <td>{{ b.source }}</td>
+          <td class="js-status">{% include "Entron/_block_badge.html" %}</td>
+          <td class="js-expires">{{ b.expires_at|date:"M d, H:i"|default:"-" }}</td>
+          <td>{{ b.repeat_count }}</td>
+          <td class="msg-cell js-message" title="{{ b.message }}">{{ b.message|default:"-" }}</td>
+          <td class="js-action">
+            {% if can_manage_alerts and b.status == "Pending" or can_manage_alerts and b.status == "Blocked" and not b.unblock_requested %}
+            <form method="post" action="{% url 'unblock_action' b.id %}" class="inline-form" style="margin:0;">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-danger">{% if b.status == "Pending" %}Cancel{% else %}Unblock{% endif %}</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr class="empty-row"><td colspan="11">No blocks match this filter.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if blocks.paginator.num_pages > 1 %}
+  <div class="pagination">
+    {% if blocks.has_previous %}
+      <a class="page-link" href="?page={{ blocks.previous_page_number }}{% if querystring %}&{{ querystring }}{% endif %}">← Prev</a>
+    {% else %}
+      <span class="page-link disabled">← Prev</span>
+    {% endif %}
+    <span class="page-status">Page {{ blocks.number }} of {{ blocks.paginator.num_pages }}</span>
+    {% if blocks.has_next %}
+      <a class="page-link" href="?page={{ blocks.next_page_number }}{% if querystring %}&{{ querystring }}{% endif %}">Next →</a>
+    {% else %}
+      <span class="page-link disabled">Next →</span>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{% static 'Entron/js/live.js' %}"></script>
+<script src="{% static 'Entron/js/blocks.js' %}"></script>
+<script>
+  const table = document.getElementById('blocks-table');
+  const CAN_MANAGE = table.dataset.canManageAlerts === 'true';
+  const UNBLOCK_URL = table.dataset.unblockUrlTemplate;
+  const CAN_INSERT = table.dataset.liveInsert === 'true' && table.dataset.page === '1';
+  const B = window.IntrusionXBlocks;
+
+  function formatTime(iso) {
+    if (!iso) return '-';
+    return new Date(iso).toLocaleString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+
+  function actionHtml(b) {
+    if (!CAN_MANAGE) return '';
+    const open = (b.status === 'Pending') || (b.status === 'Blocked' && !b.unblock_requested);
+    if (!open) return '';
+    return '<form method="post" action="' + UNBLOCK_URL.replace('999999', b.id) + '" class="inline-form" style="margin:0;">' +
+      '<input type="hidden" name="csrfmiddlewaretoken" value="' + B.csrfToken() + '">' +
+      '<button type="submit" class="btn btn-danger">' + (b.status === 'Pending' ? 'Cancel' : 'Unblock') + '</button></form>';
+  }
+
+  function rowHtml(b) {
+    return '<td>' + formatTime(b.created_at) + '</td>' +
+      '<td>' + B.escapeHtml(b.device_name) + '</td>' +
+      '<td class="primary">' + (b.cidr ? B.escapeHtml(b.cidr) + '<span class="range-tag">Range</span>' : B.escapeHtml(b.ip_address)) + '</td>' +
+      '<td>' + (b.port || 'All') + '</td>' +
+      '<td>' + B.escapeHtml(b.attack_type || '-') + '</td>' +
+      '<td>' + B.escapeHtml(b.source) + '</td>' +
+      '<td class="js-status">' + B.badge(b) + '</td>' +
+      '<td class="js-expires">' + formatTime(b.expires_at) + '</td>' +
+      '<td>' + b.repeat_count + '</td>' +
+      '<td class="msg-cell js-message" title="' + B.escapeHtml(b.message) + '">' + B.escapeHtml(b.message || '-') + '</td>' +
+      '<td class="js-action">' + actionHtml(b) + '</td>';
+  }
+
+  document.addEventListener('entronx:block', function (e) {
+    const b = e.detail;
+    const tbody = table.querySelector('tbody');
+    const existing = tbody.querySelector('tr[data-block-id="' + b.id + '"]');
+    if (existing) {
+      existing.querySelector('.js-status').innerHTML = B.badge(b);
+      existing.querySelector('.js-expires').textContent = formatTime(b.expires_at);
+      const message = existing.querySelector('.js-message');
+      message.textContent = b.message || '-';
+      message.title = b.message || '';
+      existing.querySelector('.js-action').innerHTML = actionHtml(b);
+      return;
+    }
+    if (!CAN_INSERT) return;
+    const empty = tbody.querySelector('.empty-row');
+    if (empty) empty.remove();
+    const row = document.createElement('tr');
+    row.dataset.blockId = b.id;
+    row.innerHTML = rowHtml(b);
+    tbody.insertBefore(row, tbody.firstChild);
+  });
+</script>
+{% endblock %}

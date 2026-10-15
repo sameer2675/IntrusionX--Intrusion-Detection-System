@@ -81,15 +81,18 @@
   <div class="card-body" style="padding: 8px 0 4px;">
     <table class="data-table" data-device-id="{{ device.device_id }}"
            data-can-manage-alerts="{{ can_manage_alerts|yesno:'true,false' }}"
-           data-resolve-url-template="{% url 'resolve_alert' 999999 %}">
+           data-resolve-url-template="{% url 'resolve_alert' 999999 %}"
+           data-block-url-template="{% url 'block_alert' 999999 %}"
+           data-unblock-url-template="{% url 'unblock_action' 999999 %}"
+           data-durations="{{ block_durations_json }}">
       <thead>
-        <tr><th>Time</th><th>Attack</th><th>Severity</th><th>Source IP</th><th>Confidence</th><th>Status</th><th></th></tr>
+        <tr><th>Time</th><th>Attack</th><th>Severity</th><th>Source IP</th><th>Confidence</th><th>Status</th><th></th><th>Response</th></tr>
       </thead>
       <tbody>
         {% for a in alerts %}
         <tr>
           <td>{{ a.created_at|date:"M d, H:i" }}</td>
-          <td class="primary">{{ a.attack_type }}</td>
+          <td class="primary">{{ a.attack_type }}{% if a.attack_type == "Volumetric flood" %}<div class="alert-note">{{ a.description }}</div>{% endif %}</td>
           <td>
             {% if a.severity == "High" %}<span class="badge badge-high">High</span>
             {% elif a.severity == "Medium" %}<span class="badge badge-medium">Medium</span>
@@ -109,9 +112,10 @@
             </form>
             {% endif %}
           </td>
+          <td class="block-cell" data-device-id="{{ device.device_id }}" data-ip="{{ a.source_ip }}" data-alert-id="{{ a.id }}">{% include "Entron/_block_cell.html" %}</td>
         </tr>
         {% empty %}
-        <tr class="empty-row"><td colspan="7">No alerts match this filter.</td></tr>
+        <tr class="empty-row"><td colspan="8">No alerts match this filter.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -137,6 +141,7 @@
 
 {% block extra_scripts %}
 <script src="{% static 'Entron/js/live.js' %}"></script>
+<script src="{% static 'Entron/js/blocks.js' %}"></script>
 <script>
   const table = document.querySelector('table.data-table');
   const PAGE_DEVICE_ID = table?.dataset.deviceId;
@@ -167,7 +172,7 @@
     const row = document.createElement('tr');
     row.innerHTML = `
       <td>${time}</td>
-      <td class="primary">${a.attack_type}</td>
+      <td class="primary">${a.attack_type}${a.attack_type === 'Volumetric flood' && a.description ? '<div class="alert-note">' + IntrusionXBlocks.escapeHtml(a.description) + '</div>' : ''}</td>
       <td>${severityBadge(a.severity)}</td>
       <td>${a.source_ip}</td>
       <td>${a.confidence.toFixed(1)}%</td>
@@ -177,6 +182,7 @@
           <input type="hidden" name="csrfmiddlewaretoken" value="${csrfToken()}">
           <button type="submit" class="btn">Resolve</button>
         </form>` : ''}</td>
+      ${IntrusionXBlocks.cellFor(IntrusionXBlocks.readConfig(table), a)}
     `;
     tbody.insertBefore(row, tbody.firstChild);
 
